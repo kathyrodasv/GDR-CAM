@@ -10,7 +10,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>GDR-CAM - Aplicación de Captura de Fotos V12</h1>
+        <h1>GDR-CAM - Aplicación de Captura de Fotos V13</h1>
         
         <div id="camera-section">
             <div class="video-container">
@@ -415,31 +415,34 @@
                         ctx.imageSmoothingQuality = 'high';
                         
                         // Dibujar el logo en la esquina inferior izquierda (después de rotación)
-                        const logoPadding = 12; // Ajustar espacio para mejor calidad
-                        const logoHeight = 60; // Aumentar altura para mejor calidad
+                        const logoPadding = 25; // Ajustar espacio para mayor tamaño
+                        const logoHeight = 160; // Doble del tamaño anterior
                         const logoAspectRatio = logo.width / logo.height;
                         const logoWidth = logoHeight * logoAspectRatio;
                         
-                        // Dibujar logo en la posición estándar (abajo izquierda)
-                        // Ajuste: si la imagen está rotada 90° o 270°, cambiar posición
-                        if (orientation === 6) { // 90° clockwise
-                            ctx.drawImage(
-                                logo, 
-                                canvas.width - logoHeight - logoPadding, 
-                                logoPadding, 
-                                logoHeight, 
-                                logoWidth
-                            );
-                        } else if (orientation === 8) { // 90° counterclockwise
+                        // Dibujar logo en la posición que debería aparecer después de deshacer la rotación por el visor
+                        // En lugar de dibujarlo según la orientación actual del canvas, dibujarlo en la posición lógica
+                        // Para mantenerlo en la esquina inferior izquierda visual
+                        if (orientation === 6) { // 90° clockwise - imagen girada, pero queremos logo abajo izq
+                            // En este caso, dibujar en la posición que corresponde visualmente a la esq. inf. izq
+                            // El canvas está girado, por lo que la esquina inf izq visual es otro lugar
                             ctx.drawImage(
                                 logo, 
                                 logoPadding, 
                                 canvas.height - logoHeight - logoPadding, 
-                                logoHeight, 
-                                logoWidth
+                                logoWidth, 
+                                logoHeight
+                            );
+                        } else if (orientation === 8) { // 90° counterclockwise
+                            ctx.drawImage(
+                                logo, 
+                                canvas.width - logoWidth - logoPadding, 
+                                logoPadding, 
+                                logoWidth, 
+                                logoHeight
                             );
                         } else {
-                            // Orientación normal o 180°
+                            // Orientación normal (1) o 180° (3)
                             ctx.drawImage(
                                 logo, 
                                 logoPadding, 
@@ -449,35 +452,35 @@
                             );
                         }
                         
-                        // Configurar estilo del texto
-                        ctx.font = '16px Arial';
-                        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)'; // Blanco semi-transparente
+                        // Configurar estilo del texto - tamaño duplicado
+                        ctx.font = '40px Arial';
+                        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)'; // Blanco semi-transparente con mayor opacidad
                         ctx.textAlign = 'right';
                         ctx.textBaseline = 'bottom';
                         
-                        // Dibujar la fecha y hora en la esquina inferior derecha (después de rotación)
+                        // Dibujar la fecha y hora en la esquina inferior derecha visual
                         if (orientation === 6) { // 90° clockwise
-                            ctx.fillText(timestamp, canvas.width - 10, logoHeight + 20);
+                            ctx.fillText(timestamp, canvas.width - 15, canvas.height - 15);
                         } else if (orientation === 8) { // 90° counterclockwise
-                            ctx.fillText(timestamp, logoHeight + 15, canvas.height - 10);
+                            ctx.fillText(timestamp, 15 + logoWidth, logoPadding + 40);
                         } else {
-                            // Orientación normal o 180°
-                            ctx.fillText(timestamp, canvas.width - 10, canvas.height - 10);
+                            // Orientación normal (1) o 180° (3)
+                            ctx.fillText(timestamp, canvas.width - 15, canvas.height - 15);
                         }
                         
                         // Agregar sombra para mejor visibilidad
-                        ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
-                        ctx.shadowBlur = 3;
-                        ctx.shadowOffsetX = 1;
-                        ctx.shadowOffsetY = 1;
+                        ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+                        ctx.shadowBlur = 6;
+                        ctx.shadowOffsetX = 3;
+                        ctx.shadowOffsetY = 3;
                         
                         if (orientation === 6) { // 90° clockwise
-                            ctx.fillText(timestamp, canvas.width - 10, logoHeight + 20);
+                            ctx.fillText(timestamp, canvas.width - 15, logoHeight + 40);
                         } else if (orientation === 8) { // 90° counterclockwise
-                            ctx.fillText(timestamp, logoHeight + 15, canvas.height - 10);
+                            ctx.fillText(timestamp, logoHeight + 30, canvas.height - 15);
                         } else {
                             // Orientación normal o 180°
-                            ctx.fillText(timestamp, canvas.width - 10, canvas.height - 10);
+                            ctx.fillText(timestamp, canvas.width - 15, canvas.height - 15);
                         }
                         
                         // Restablecer la sombra
@@ -537,35 +540,35 @@
                         ctx.imageSmoothingEnabled = true;
                         ctx.imageSmoothingQuality = 'high';
                         
-                        // Configurar estilo del texto
-                        ctx.font = '16px Arial';
-                        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)'; // Blanco semi-transparente
+                        // Configurar estilo del texto - tamaño duplicado
+                        ctx.font = '40px Arial';
+                        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)'; // Blanco semi-transparente con mayor opacidad
                         ctx.textAlign = 'right';
                         ctx.textBaseline = 'bottom';
                         
-                        // Dibujar la fecha y hora en la esquina inferior derecha (después de rotación)
+                        // Dibujar la fecha y hora en la esquina inferior derecha visual
                         if (orientation === 6) { // 90° clockwise
-                            ctx.fillText(timestamp, canvas.width - 10, 20);
+                            ctx.fillText(timestamp, canvas.width - 15, canvas.height - 15);
                         } else if (orientation === 8) { // 90° counterclockwise
-                            ctx.fillText(timestamp, 15, canvas.height - 10);
+                            ctx.fillText(timestamp, 15, 40); // Adjust position for counter-clockwise
                         } else {
-                            // Orientación normal o 180°
-                            ctx.fillText(timestamp, canvas.width - 10, canvas.height - 10);
+                            // Orientación normal (1) o 180° (3)
+                            ctx.fillText(timestamp, canvas.width - 15, canvas.height - 15);
                         }
                         
                         // Agregar sombra para mejor visibilidad
-                        ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
-                        ctx.shadowBlur = 3;
-                        ctx.shadowOffsetX = 1;
-                        ctx.shadowOffsetY = 1;
+                        ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+                        ctx.shadowBlur = 6;
+                        ctx.shadowOffsetX = 3;
+                        ctx.shadowOffsetY = 3;
                         
                         if (orientation === 6) { // 90° clockwise
-                            ctx.fillText(timestamp, canvas.width - 10, 20);
+                            ctx.fillText(timestamp, canvas.width - 15, canvas.height - 15);
                         } else if (orientation === 8) { // 90° counterclockwise
-                            ctx.fillText(timestamp, 15, canvas.height - 10);
+                            ctx.fillText(timestamp, 15, 40); // Adjust position for counter-clockwise
                         } else {
-                            // Orientación normal o 180°
-                            ctx.fillText(timestamp, canvas.width - 10, canvas.height - 10);
+                            // Orientación normal (1) o 180° (3)
+                            ctx.fillText(timestamp, canvas.width - 15, canvas.height - 15);
                         }
                         
                         // Restablecer la sombra
