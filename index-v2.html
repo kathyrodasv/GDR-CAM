@@ -10,7 +10,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>GDR-CAM - Aplicación de Captura de Fotos V3</h1>
+        <h1>GDR-CAM - Aplicación de Captura de Fotos</h1>
         
         <div id="camera-section">
             <div class="video-container">
@@ -133,9 +133,7 @@
                         currentLocation = {
                             latitude: position.coords.latitude,
                             longitude: position.coords.longitude,
-                            accuracy: position.coords.accuracy,
-                            altitude: position.coords.altitude,
-                            timestamp: position.timestamp
+                            accuracy: position.coords.accuracy
                         };
                         console.log('Ubicación obtenida:', currentLocation);
                     },
@@ -269,14 +267,6 @@
                                 [Math.floor(lngSec * 1000), 1000]
                             ]
                         };
-                        
-                        // Agregar altitud si está disponible
-                        if (metadata.location.altitude !== null && metadata.location.altitude !== undefined) {
-                            const alt = Math.abs(metadata.location.altitude);
-                            const altRef = metadata.location.altitude >= 0 ? 0 : 1; // 0 = sobre el nivel del mar, 1 = bajo el nivel del mar
-                            exifObj["GPS"][piexif.GPSIFD.GPSAltitudeRef] = altRef;
-                            exifObj["GPS"][piexif.GPSIFD.GPSAltitude] = [Math.floor(alt * 1000), 1000];
-                        }
                     }
                     
                     // Aplicar la fecha actual al campo DateTimeOriginal

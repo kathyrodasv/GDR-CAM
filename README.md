@@ -10,7 +10,7 @@ GDR-CAM es una aplicación web progresiva (PWA) para tomar fotos con metadatos. 
   - Tipo de observación
   - Actividad realizada
 - Almacenar todos los datos como metadatos en la foto
-- Descargar la foto con metadatos incrustados
+- Guardar la foto directamente en la galería del dispositivo (con soporte especial para iOS)
 - Funcionar completamente offline
 
 ## Características
@@ -50,12 +50,19 @@ La aplicación se puede instalar como una aplicación nativa en tu dispositivo:
 
 ## Metadatos Almacenados
 
-La información del formulario se almacena en los metadatos EXIF de la imagen bajo el campo "UserComment", incluyendo:
+La información del formulario y ubicación se almacena en los metadatos EXIF de la imagen, incluyendo:
 
+**Datos del formulario:**
 - Frente de trabajo
 - Coronamiento
 - Tipo de observación
 - Actividad realizada
+
+**Datos de ubicación (GPS):**
+- Latitud
+- Longitud
+- Altitud (si está disponible)
+- Precisión
 - Fecha y hora de captura
 
 ## Estructura del Proyecto
