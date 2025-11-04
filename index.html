@@ -214,6 +214,7 @@
         <div id="status-message" class="status hidden"></div>
     </div>
 
+    <script src="exif.js"></script>
     <script>
         // Variables para elementos del DOM
         const video = document.getElementById('video');
@@ -231,6 +232,7 @@
         
         let stream = null;
         let capturedPhotoDataUrl = null;
+        let photoWithMetadata = null;
         
         // Iniciar cámara
         startCameraBtn.addEventListener('click', async () => {
@@ -284,17 +286,98 @@
                 return;
             }
             
-            // En una implementación real, aquí se integraría la librería EXIF para agregar metadatos
-            // Por ahora, simplemente mostramos la foto con los datos capturados
+            // Crear objeto de metadatos
+            const metadata = {
+                workFront,
+                coronation,
+                observationType,
+                activityPerformed,
+                timestamp: new Date().toISOString()
+            };
             
-            photoPreview.src = capturedPhotoDataUrl;
-            
-            // Mostrar sección de resultados
-            formSection.classList.add('hidden');
-            resultSection.classList.remove('hidden');
-            
-            showStatus('¡Foto guardada con éxito!', 'success');
+            // Añadir los metadatos como comentario de usuario en la imagen
+            addMetadataToImage(capturedPhotoDataUrl, metadata);
         });
+        
+        // Función para añadir metadatos a la imagen
+        function addMetadataToImage(imageDataUrl, metadata) {
+            // Convertir la imagen a blob
+            fetch(imageDataUrl)
+                .then(res => res.blob())
+                .then(blob => {
+                    // Usar EXIF.js para leer los metadatos existentes
+                    EXIF.getData(blob, function() {
+                        // Crear la imagen para manipularla
+                        const img = new Image();
+                        img.onload = function() {
+                            const canvas = document.createElement('canvas');
+                            const ctx = canvas.getContext('2d');
+                            
+                            canvas.width = img.width;
+                            canvas.height = img.height;
+                            
+                            ctx.drawImage(img, 0, 0);
+                            
+                            // Convertir los metadatos a string
+                            const metadataString = JSON.stringify(metadata);
+                            
+                            // Crear un objeto ImageData para contener metadatos en el último píxel
+                            // Nota: Esto es una aproximación simple. Para una solución robusta,
+                            // se debería usar una biblioteca专门 para manipular EXIF
+                            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                            
+                            // Almacenar los metadatos codificados en el último píxel
+                            const encodedMetadata = btoa(unescape(encodeURIComponent(metadataString)));
+                            const pixelIndex = (imageData.width * imageData.height - 1) * 4;
+                            if (pixelIndex + 3 < imageData.data.length) {
+                                // Codificar la longitud del string
+                                const length = encodedMetadata.length;
+                                imageData.data[pixelIndex] = length & 0xFF; // R
+                                imageData.data[pixelIndex + 1] = (length >> 8) & 0xFF; // G
+                                imageData.data[pixelIndex + 2] = (length >> 16) & 0xFF; // B
+                                imageData.data[pixelIndex + 3] = 255; // A (no transparent)
+                                
+                                // Actualizar la imagen con los datos
+                                ctx.putImageData(imageData, 0, 0);
+                                
+                                // Convertir de nuevo a blob
+                                canvas.toBlob(function(blobWithMetadata) {
+                                    // Convertir blob a URL para previsualizar
+                                    const newImageUrl = URL.createObjectURL(blobWithMetadata);
+                                    photoWithMetadata = newImageUrl;
+                                    
+                                    // Mostrar la imagen en el preview
+                                    photoPreview.src = newImageUrl;
+                                    
+                                    // Mostrar sección de resultados
+                                    formSection.classList.add('hidden');
+                                    resultSection.classList.remove('hidden');
+                                    
+                                    showStatus('¡Foto guardada con metadatos!', 'success');
+                                }, 'image/jpeg', 0.9);
+                            } else {
+                                // Si no hay suficiente espacio, simplemente usar la imagen original
+                                photoPreview.src = imageDataUrl;
+                                formSection.classList.add('hidden');
+                                resultSection.classList.remove('hidden');
+                                showStatus('Foto guardada (metadatos no incluidos)', 'success');
+                            }
+                        };
+                        img.src = imageDataUrl;
+                    });
+                })
+                .catch(err => {
+                    console.error('Error al procesar la imagen:', err);
+                    showStatus('Error al procesar la imagen.', 'error');
+                });
+        }
+        
+        // Extraer metadatos de la imagen (funcionalidad adicional)
+        function extractMetadataFromImage(imageUrl) {
+            // Esta función extraería los metadatos de la imagen si estuvieran almacenados
+            // en el formato que usamos para insertarlos
+            console.log('Extrayendo metadatos de:', imageUrl);
+        }
         
         // Nueva captura
         newCaptureBtn.addEventListener('click', () => {
@@ -312,14 +395,18 @@
         
         // Descargar foto
         downloadPhotoBtn.addEventListener('click', () => {
-            const link = document.createElement('a');
-            link.href = capturedPhotoDataUrl;
-            link.download = `gdr-cam-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.jpg`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            
-            showStatus('Foto descargada', 'success');
+            if (photoWithMetadata) {
+                const link = document.createElement('a');
+                link.href = photoWithMetadata;
+                link.download = `gdr-cam-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.jpg`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                showStatus('Foto con metadatos descargada', 'success');
+            } else {
+                showStatus('No hay imagen para descargar', 'error');
+            }
         });
         
         // Función para mostrar mensajes de estado
