@@ -10,7 +10,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>GDR-CAM - Aplicación de Captura de Fotos V3</h1>
+        <h1>GDR-CAM - Aplicación de Captura de Fotos V4</h1>
         
         <div id="camera-section">
             <div class="video-container">
@@ -403,20 +403,7 @@
                 showStatus('No hay imagen para guardar', 'error');
                 return;
             }
-            
-            // Determinar si es un dispositivo iOS
-            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-            
-            if (isIOS) {
-                // Para dispositivos iOS, mostrar instrucciones
-                showStatus('Mantén presionada la imagen y selecciona "Guardar imagen" para guardar en la galería', 'success');
-                
-                // Abrir la imagen en una nueva ventana para facilitar el guardado
-                window.open(photoWithMetadata, '_blank');
-            } else {
-                // Para otros dispositivos, intentar guardar directamente
-                saveToGallery(photoWithMetadata);
-            }
+            saveToGallery(photoWithMetadata);
         });
         
         // Nueva captura
