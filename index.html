@@ -64,6 +64,7 @@
             cursor: pointer;
             font-size: 16px;
             margin: 0 10px;
+            min-width: 120px;
         }
         
         button:hover {
@@ -135,6 +136,28 @@
             margin-top: 15px;
         }
         
+        .action-buttons .btn-full-width {
+            display: inline-block;
+            width: auto;
+            min-width: 200px;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
         @media (max-width: 600px) {
             body {
                 padding: 10px;
@@ -148,6 +171,27 @@
                 display: block;
                 width: 100%;
                 margin: 10px 0;
+                min-width: auto;
+            }
+            
+            .action-buttons .btn-full-width {
+                width: 100%;
+            }
+            
+            video {
+                max-width: 100%;
+                height: auto;
+            }
+        }
+        
+        @media (max-height: 700px) {
+            .video-container {
+                max-height: 30vh;
+            }
+            
+            video {
+                max-height: 30vh;
+                width: auto;
             }
         }
     </style>
@@ -215,6 +259,7 @@
     </div>
 
     <script src="exif.js"></script>
+    <script src="piexif.js"></script>
     <script>
         // Variables para elementos del DOM
         const video = document.getElementById('video');
@@ -286,6 +331,10 @@
                 return;
             }
             
+            // Mostrar indicador de carga
+            saveMetadataBtn.innerHTML = '<span class="loading"></span> Procesando...';
+            saveMetadataBtn.disabled = true;
+            
             // Crear objeto de metadatos
             const metadata = {
                 workFront,
@@ -295,88 +344,84 @@
                 timestamp: new Date().toISOString()
             };
             
-            // Añadir los metadatos como comentario de usuario en la imagen
+            // Añadir los metadatos a la imagen
             addMetadataToImage(capturedPhotoDataUrl, metadata);
         });
         
         // Función para añadir metadatos a la imagen
         function addMetadataToImage(imageDataUrl, metadata) {
-            // Convertir la imagen a blob
-            fetch(imageDataUrl)
-                .then(res => res.blob())
-                .then(blob => {
-                    // Usar EXIF.js para leer los metadatos existentes
-                    EXIF.getData(blob, function() {
-                        // Crear la imagen para manipularla
-                        const img = new Image();
-                        img.onload = function() {
-                            const canvas = document.createElement('canvas');
-                            const ctx = canvas.getContext('2d');
-                            
-                            canvas.width = img.width;
-                            canvas.height = img.height;
-                            
-                            ctx.drawImage(img, 0, 0);
-                            
-                            // Convertir los metadatos a string
-                            const metadataString = JSON.stringify(metadata);
-                            
-                            // Crear un objeto ImageData para contener metadatos en el último píxel
-                            // Nota: Esto es una aproximación simple. Para una solución robusta,
-                            // se debería usar una biblioteca专门 para manipular EXIF
-                            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                            
-                            // Almacenar los metadatos codificados en el último píxel
-                            const encodedMetadata = btoa(unescape(encodeURIComponent(metadataString)));
-                            const pixelIndex = (imageData.width * imageData.height - 1) * 4;
-                            if (pixelIndex + 3 < imageData.data.length) {
-                                // Codificar la longitud del string
-                                const length = encodedMetadata.length;
-                                imageData.data[pixelIndex] = length & 0xFF; // R
-                                imageData.data[pixelIndex + 1] = (length >> 8) & 0xFF; // G
-                                imageData.data[pixelIndex + 2] = (length >> 16) & 0xFF; // B
-                                imageData.data[pixelIndex + 3] = 255; // A (no transparent)
-                                
-                                // Actualizar la imagen con los datos
-                                ctx.putImageData(imageData, 0, 0);
-                                
-                                // Convertir de nuevo a blob
-                                canvas.toBlob(function(blobWithMetadata) {
-                                    // Convertir blob a URL para previsualizar
-                                    const newImageUrl = URL.createObjectURL(blobWithMetadata);
-                                    photoWithMetadata = newImageUrl;
-                                    
-                                    // Mostrar la imagen en el preview
-                                    photoPreview.src = newImageUrl;
-                                    
-                                    // Mostrar sección de resultados
-                                    formSection.classList.add('hidden');
-                                    resultSection.classList.remove('hidden');
-                                    
-                                    showStatus('¡Foto guardada con metadatos!', 'success');
-                                }, 'image/jpeg', 0.9);
-                            } else {
-                                // Si no hay suficiente espacio, simplemente usar la imagen original
-                                photoPreview.src = imageDataUrl;
-                                formSection.classList.add('hidden');
-                                resultSection.classList.remove('hidden');
-                                showStatus('Foto guardada (metadatos no incluidos)', 'success');
-                            }
-                        };
-                        img.src = imageDataUrl;
-                    });
-                })
-                .catch(err => {
-                    console.error('Error al procesar la imagen:', err);
-                    showStatus('Error al procesar la imagen.', 'error');
-                });
-        }
-        
-        // Extraer metadatos de la imagen (funcionalidad adicional)
-        function extractMetadataFromImage(imageUrl) {
-            // Esta función extraería los metadatos de la imagen si estuvieran almacenados
-            // en el formato que usamos para insertarlos
-            console.log('Extrayendo metadatos de:', imageUrl);
+            try {
+                // Convertir data URL a array buffer
+                let binary = atob(imageDataUrl.split(',')[1]);
+                let arrayBuffer = new ArrayBuffer(binary.length);
+                let uint8Array = new Uint8Array(arrayBuffer);
+                
+                for (let i = 0; i < binary.length; i++) {
+                    uint8Array[i] = binary.charCodeAt(i);
+                }
+                
+                // Cargar la imagen existente con piexif
+                let exifObj = piexif.load(imageDataUrl);
+                
+                // Si no hay exif, crear uno vacío
+                if (!exifObj) {
+                    exifObj = {
+                        "0th": {},
+                        "Exif": {},
+                        "GPS": {},
+                        "Interop": {},
+                        "thumbnail": null
+                    };
+                }
+                
+                // Agregar los metadatos como un comentario de usuario
+                // Codificar los metadatos como una cadena JSON
+                const userComment = JSON.stringify(metadata);
+                
+                // Guardar en el campo UserComment de los metadatos EXIF
+                exifObj["Exif"][piexif.ExifIFD.UserComment] = userComment;
+                
+                // Aplicar la fecha actual al campo DateTimeOriginal
+                const now = new Date();
+                const dateTimeOriginal = now.getFullYear() + ":" + 
+                    String(now.getMonth() + 1).padStart(2, '0') + ":" + 
+                    String(now.getDate()).padStart(2, '0') + " " +
+                    String(now.getHours()).padStart(2, '0') + ":" + 
+                    String(now.getMinutes()).padStart(2, '0') + ":" + 
+                    String(now.getSeconds()).padStart(2, '0');
+                
+                exifObj["Exif"][piexif.ExifIFD.DateTimeOriginal] = dateTimeOriginal;
+                
+                // Convertir el objeto EXIF a bytes
+                const exifBytes = piexif.dump(exifObj);
+                
+                // Insertar los metadatos en la imagen
+                const newImage = piexif.insert(exifBytes, imageDataUrl);
+                
+                // Guardar la imagen con metadatos
+                photoWithMetadata = newImage;
+                
+                // Mostrar la imagen en el preview
+                photoPreview.src = newImage;
+                
+                // Mostrar sección de resultados
+                formSection.classList.add('hidden');
+                resultSection.classList.remove('hidden');
+                
+                showStatus('¡Foto guardada con metadatos!', 'success');
+                
+                // Restablecer el botón
+                saveMetadataBtn.innerHTML = 'Guardar Foto con Metadatos';
+                saveMetadataBtn.disabled = false;
+                
+            } catch (err) {
+                console.error('Error al insertar metadatos:', err);
+                showStatus('Error al insertar metadatos: ' + err.message, 'error');
+                
+                // Restablecer el botón
+                saveMetadataBtn.innerHTML = 'Guardar Foto con Metadatos';
+                saveMetadataBtn.disabled = false;
+            }
         }
         
         // Nueva captura
@@ -396,14 +441,35 @@
         // Descargar foto
         downloadPhotoBtn.addEventListener('click', () => {
             if (photoWithMetadata) {
-                const link = document.createElement('a');
-                link.href = photoWithMetadata;
-                link.download = `gdr-cam-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.jpg`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
+                // Mostrar indicador de carga
+                downloadPhotoBtn.innerHTML = '<span class="loading"></span> Descargando...';
+                downloadPhotoBtn.disabled = true;
                 
-                showStatus('Foto con metadatos descargada', 'success');
+                // Convertir la imagen con metadatos a blob para descargar
+                fetch(photoWithMetadata)
+                    .then(res => res.blob())
+                    .then(blob => {
+                        const link = document.createElement('a');
+                        link.href = URL.createObjectURL(blob);
+                        link.download = `gdr-cam-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.jpg`;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        
+                        showStatus('Foto con metadatos descargada', 'success');
+                        
+                        // Restablecer el botón
+                        downloadPhotoBtn.innerHTML = 'Descargar Foto';
+                        downloadPhotoBtn.disabled = false;
+                    })
+                    .catch(err => {
+                        console.error('Error al descargar la imagen:', err);
+                        showStatus('Error al descargar la imagen', 'error');
+                        
+                        // Restablecer el botón
+                        downloadPhotoBtn.innerHTML = 'Descargar Foto';
+                        downloadPhotoBtn.disabled = false;
+                    });
             } else {
                 showStatus('No hay imagen para descargar', 'error');
             }

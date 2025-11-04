@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test de GDR-CAM</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .status.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test de Funcionalidad de GDR-CAM</h1>
+    
+    <div class="test-section">
+        <h2>1. Verificación de Service Worker</h2>
+        <button id="check-sw">Verificar Service Worker</button>
+        <div id="sw-status"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>2. Verificación de Web App Manifest</h2>
+        <button id="check-manifest">Verificar Manifest</button>
+        <div id="manifest-status"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>3. Verificación de Acceso a Cámara</h2>
+        <button id="test-camera">Probar Cámara</button>
+        <video id="test-video" width="320" height="240" style="display:none;"></video>
+        <div id="camera-status"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>4. Verificación de Funcionalidad Offline</h2>
+        <p>Después de cargar esta página, intente desconectarse de internet y recargar la página para verificar que aún se carga offline.</p>
+        <div id="offline-status"></div>
+    </div>
+
+    <script>
+        // Verificar Service Worker
+        document.getElementById('check-sw').addEventListener('click', function() {
+            const swStatus = document.getElementById('sw-status');
+            
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                    if (registrations.length > 0) {
+                        swStatus.innerHTML = '<div class="status success">✓ Service Worker registrado</div>';
+                        registrations.forEach(function(registration) {
+                            swStatus.innerHTML += `<p>Scope: ${registration.scope}</p>`;
+                        });
+                    } else {
+                        swStatus.innerHTML = '<div class="status error">✗ No hay Service Worker registrado</div>';
+                    }
+                });
+            } else {
+                swStatus.innerHTML = '<div class="status error">✗ Service Worker no soportado en este navegador</div>';
+            }
+        });
+        
+        // Verificar Web App Manifest
+        document.getElementById('check-manifest').addEventListener('click', function() {
+            const manifestStatus = document.getElementById('manifest-status');
+            
+            // Verificar si hay un link al manifest
+            const manifestLink = document.querySelector('link[rel="manifest"]');
+            if (manifestLink) {
+                fetch(manifestLink.href)
+                    .then(response => {
+                        if (response.ok) {
+                            return response.json();
+                        } else {
+                            throw new Error('No se pudo cargar el manifest');
+                        }
+                    })
+                    .then(manifest => {
+                        manifestStatus.innerHTML = '<div class="status success">✓ Web App Manifest encontrado y accesible</div>';
+                        manifestStatus.innerHTML += `<p>Nombre: ${manifest.name || 'No especificado'}</p>`;
+                        manifestStatus.innerHTML += `<p>Short Name: ${manifest.short_name || 'No especificado'}</p>`;
+                    })
+                    .catch(error => {
+                        manifestStatus.innerHTML = `<div class="status error">✗ Error al cargar el manifest: ${error.message}</div>`;
+                    });
+            } else {
+                manifestStatus.innerHTML = '<div class="status error">✗ No se encontró el Web App Manifest</div>';
+            }
+        });
+        
+        // Verificar acceso a cámara
+        document.getElementById('test-camera').addEventListener('click', function() {
+            const cameraStatus = document.getElementById('camera-status');
+            const video = document.getElementById('test-video');
+            
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                navigator.mediaDevices.getUserMedia({ video: true })
+                    .then(function(stream) {
+                        video.srcObject = stream;
+                        video.style.display = 'block';
+                        cameraStatus.innerHTML = '<div class="status success">✓ Acceso a cámara concedido</div>';
+                        
+                        // Detener la transmisión después de 2 segundos
+                        setTimeout(function() {
+                            const tracks = stream.getTracks();
+                            tracks.forEach(track => track.stop());
+                            video.style.display = 'none';
+                        }, 2000);
+                    })
+                    .catch(function(err) {
+                        cameraStatus.innerHTML = `<div class="status error">✗ Error al acceder a la cámara: ${err.message}</div>`;
+                    });
+            } else {
+                cameraStatus.innerHTML = '<div class="status error">✗ API de getUserMedia no soportada en este navegador</div>';
+            }
+        });
+        
+        // Verificar estado de conexión
+        function checkConnectivity() {
+            const offlineStatus = document.getElementById('offline-status');
+            if (navigator.onLine) {
+                offlineStatus.innerHTML = '<div class="status success">✓ Conectado a internet</div>';
+            } else {
+                offlineStatus.innerHTML = '<div class="status error">✗ Sin conexión a internet</div>';
+            }
+        }
+        
+        // Verificar cuando se carga la página
+        checkConnectivity();
+        
+        // Verificar cambios en la conectividad
+        window.addEventListener('online', checkConnectivity);
+        window.addEventListener('offline', checkConnectivity);
+    </script>
+</body>
+</html>
