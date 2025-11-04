@@ -19,8 +19,8 @@
             </div>
             
             <div class="controls">
-                <button id="start-camera">Iniciar Cámara</button>
-                <button id="take-photo" disabled>Tomar Foto</button>
+                <button id="start-camera">📸 Iniciar Cámara</button>
+                <button id="take-photo" disabled>📷 Tomar Foto</button>
             </div>
         </div>
         
@@ -37,14 +37,16 @@
                 <input type="text" id="coronation" required>
             </div>
             
+
+            
             <div class="form-group">
-                <label for="observation-type">Tipo de Observación:</label>
-                <select id="observation-type" required>
+                <label for="observation-category">Categoría de Observación:</label>
+                <select id="observation-category" required>
                     <option value="">Seleccione una opción</option>
-                    <option value="estructural">Estructural</option>
-                    <option value="ambiental">Ambiental</option>
-                    <option value="geotecnica">Geotécnica</option>
-                    <option value="otro">Otro</option>
+                    <option value="rutina">Rutina</option>
+                    <option value="liberacion">Liberación</option>
+                    <option value="novedad">Novedad</option>
+                    <option value="importante">Importante</option>
                 </select>
             </div>
             
@@ -60,6 +62,7 @@
             
             <div class="action-buttons">
                 <button id="save-metadata">Guardar Foto con Metadatos</button>
+                <button id="save-photo-without-form">Guardar Foto sin Formulario</button>
             </div>
         </div>
         
@@ -226,10 +229,10 @@
         saveMetadataBtn.addEventListener('click', () => {
             const workFront = document.getElementById('work-front').value;
             const coronation = document.getElementById('coronation').value;
-            const observationType = document.getElementById('observation-type').value;
             const activityPerformed = document.getElementById('activity-performed').value;
+            const observationCategory = document.getElementById('observation-category').value;
             
-            if (!workFront || !coronation || !observationType || !activityPerformed) {
+            if (!workFront || !coronation || !activityPerformed || !observationCategory) {
                 showStatus('Por favor complete todos los campos del formulario.', 'error');
                 return;
             }
@@ -238,8 +241,8 @@
             const metadata = {
                 workFront,
                 coronation,
-                observationType,
                 activityPerformed,
+                observationCategory,
                 location: currentLocation,
                 timestamp: new Date().toLocaleString() // Using local time format instead of ISO string
             };
@@ -252,104 +255,268 @@
             addMetadataToImage(capturedPhotoDataUrl, metadata);
         });
         
+        // Guardar foto sin formulario (solo GPS y fecha/hora)
+        document.getElementById('save-photo-without-form').addEventListener('click', () => {
+            // Crear objeto de metadatos con solo GPS y fecha/hora
+            const metadata = {
+                location: currentLocation,
+                timestamp: new Date().toLocaleString()
+            };
+            
+            // Mostrar indicador de carga
+            const saveWithoutFormBtn = document.getElementById('save-photo-without-form');
+            saveWithoutFormBtn.innerHTML = '<span class="loading"></span> Procesando...';
+            saveWithoutFormBtn.disabled = true;
+            
+            // Añadir los metadatos a la imagen
+            addMetadataToImage(capturedPhotoDataUrl, metadata);
+        });
+        
+        // Función para dibujar la fecha y hora y el logo en la imagen
+        function drawTimestampAndLogoOnImage(imageDataUrl, timestamp) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = function() {
+                    // Cargar el logo
+                    const logo = new Image();
+                    logo.onload = function() {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        const ctx = canvas.getContext('2d');
+                        
+                        // Dibujar la imagen original
+                        ctx.drawImage(img, 0, 0);
+                        
+                        // Dibujar el logo en la esquina inferior izquierda
+                        const logoPadding = 10; // Espacio desde los bordes
+                        const logoHeight = 40; // Altura fija para el logo
+                        const logoAspectRatio = logo.width / logo.height;
+                        const logoWidth = logoHeight * logoAspectRatio;
+                        
+                        ctx.drawImage(logo, logoPadding, canvas.height - logoHeight - logoPadding, logoWidth, logoHeight);
+                        
+                        // Configurar estilo del texto
+                        ctx.font = '16px Arial';
+                        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)'; // Blanco semi-transparente
+                        ctx.textAlign = 'right';
+                        ctx.textBaseline = 'bottom';
+                        
+                        // Dibujar la fecha y hora en la esquina inferior derecha
+                        ctx.fillText(timestamp, canvas.width - 10, canvas.height - 10);
+                        
+                        // Agregar sombra para mejor visibilidad
+                        ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+                        ctx.shadowBlur = 3;
+                        ctx.shadowOffsetX = 1;
+                        ctx.shadowOffsetY = 1;
+                        ctx.fillText(timestamp, canvas.width - 10, canvas.height - 10);
+                        
+                        // Restablecer la sombra
+                        ctx.shadowColor = 'transparent';
+                        ctx.shadowBlur = 0;
+                        ctx.shadowOffsetX = 0;
+                        ctx.shadowOffsetY = 0;
+                        
+                        // Devolver la imagen con el texto y logo como data URL
+                        resolve(canvas.toDataURL('image/jpeg', 0.9));
+                    };
+                    logo.onerror = function() {
+                        // Si no se puede cargar el logo, continuar solo con el timestamp
+                        const canvas = document.createElement('canvas');
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        const ctx = canvas.getContext('2d');
+                        
+                        // Dibujar la imagen original
+                        ctx.drawImage(img, 0, 0);
+                        
+                        // Configurar estilo del texto
+                        ctx.font = '16px Arial';
+                        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)'; // Blanco semi-transparente
+                        ctx.textAlign = 'right';
+                        ctx.textBaseline = 'bottom';
+                        
+                        // Dibujar la fecha y hora en la esquina inferior derecha
+                        ctx.fillText(timestamp, canvas.width - 10, canvas.height - 10);
+                        
+                        // Agregar sombra para mejor visibilidad
+                        ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+                        ctx.shadowBlur = 3;
+                        ctx.shadowOffsetX = 1;
+                        ctx.shadowOffsetY = 1;
+                        ctx.fillText(timestamp, canvas.width - 10, canvas.height - 10);
+                        
+                        // Restablecer la sombra
+                        ctx.shadowColor = 'transparent';
+                        ctx.shadowBlur = 0;
+                        ctx.shadowOffsetX = 0;
+                        ctx.shadowOffsetY = 0;
+                        
+                        // Devolver la imagen con el texto como data URL
+                        resolve(canvas.toDataURL('image/jpeg', 0.9));
+                    };
+                    logo.src = 'img/LOGO GDR.jpeg'; // Ruta al logo
+                };
+                img.onerror = function() {
+                    reject(new Error('Error al cargar la imagen'));
+                };
+                img.src = imageDataUrl;
+            });
+        }
+
         // Función para añadir metadatos a la imagen
-        function addMetadataToImage(imageDataUrl, metadata) {
+        async function addMetadataToImage(imageDataUrl, metadata) {
             console.log("Iniciando addMetadataToImage");
             console.log("imageDataUrl (primeros 100 caracteres):", imageDataUrl.slice(0, 100));
-            if (typeof piexif !== 'undefined' && piexif.dump) {
-                try {
-                    console.log("Cargando EXIF data desde la imagen...");
-                    let exifObj = piexif.load(imageDataUrl);
-                    console.log("EXIF data cargado:", JSON.parse(JSON.stringify(exifObj)));
+            
+            try {
+                // Agregar la fecha y hora como texto en la imagen
+                const timestampedImage = await drawTimestampAndLogoOnImage(imageDataUrl, metadata.timestamp);
+                
+                if (typeof piexif !== 'undefined' && piexif.dump) {
+                    try {
+                        console.log("Cargando EXIF data desde la imagen...");
+                        let exifObj = piexif.load(timestampedImage);
+                        console.log("EXIF data cargado:", JSON.parse(JSON.stringify(exifObj)));
 
-                    if (!exifObj) {
-                        console.log("No se encontró EXIF data, creando objeto vacío.");
-                        exifObj = {"0th": {}, "Exif": {}, "GPS": {}, "Interop": {}, "thumbnail": null};
-                    }
-
-                    console.log("Metadata a agregar:", metadata);
-                    
-                    // Handle the encoding of the user comment
-                    let userComment;
-                    if (piexif.helper && piexif.helper.encodeToUnicode) {
-                        userComment = piexif.helper.encodeToUnicode(JSON.stringify(metadata));
-                    } else {
-                        // Fallback: try to use the simpler ASCII encoding
-                        // First, ensure metadata is properly stringified and encode safely
-                        const metadataStr = JSON.stringify(metadata);
-                        // Convert the string to a format that piexif can handle
-                        userComment = "ASCII\0" + metadataStr;
-                    }
-                    
-                    exifObj["Exif"][piexif.ExifIFD.UserComment] = userComment;
-                    console.log("UserComment agregado al objeto EXIF.");
-
-                    if (metadata.location) {
-                        console.log("Agregando datos GPS...");
-                        const lat = metadata.location.latitude;
-                        const lng = metadata.location.longitude;
-                        const latRef = lat >= 0 ? "N" : "S";
-                        const lngRef = lng >= 0 ? "E" : "W";
-                        const absLat = Math.abs(lat);
-                        const absLng = Math.abs(lng);
-                        const latDeg = Math.floor(absLat);
-                        const latMin = Math.floor((absLat - latDeg) * 60);
-                        const latSec = Math.floor(((absLat - latDeg) * 60 - latMin) * 60 * 1000) / 1000;
-                        const lngDeg = Math.floor(absLng);
-                        const lngMin = Math.floor((absLng - lngDeg) * 60);
-                        const lngSec = Math.floor(((absLng - lngDeg) * 60 - lngMin) * 60 * 1000) / 1000;
-
-                        exifObj["GPS"] = {
-                            [piexif.GPSIFD.GPSVersionID]: [2, 2, 0, 0],
-                            [piexif.GPSIFD.GPSLatitudeRef]: latRef,
-                            [piexif.GPSIFD.GPSLatitude]: [[latDeg, 1], [latMin, 1], [Math.floor(latSec * 1000), 1000]],
-                            [piexif.GPSIFD.GPSLongitudeRef]: lngRef,
-                            [piexif.GPSIFD.GPSLongitude]: [[lngDeg, 1], [lngMin, 1], [Math.floor(lngSec * 1000), 1000]]
-                        };
-
-                        if (metadata.location.altitude !== null && metadata.location.altitude !== undefined) {
-                            const alt = Math.abs(metadata.location.altitude);
-                            const altRef = metadata.location.altitude >= 0 ? 0 : 1;
-                            exifObj["GPS"][piexif.GPSIFD.GPSAltitudeRef] = altRef;
-                            exifObj["GPS"][piexif.GPSIFD.GPSAltitude] = [Math.floor(alt * 1000), 1000];
+                        if (!exifObj) {
+                            console.log("No se encontró EXIF data, creando objeto vacío.");
+                            exifObj = {"0th": {}, "Exif": {}, "GPS": {}, "Interop": {}, "thumbnail": null};
                         }
-                        console.log("Datos GPS agregados:", exifObj["GPS"]);
+
+                        console.log("Metadata a agregar:", metadata);
+                        
+                        // Only add UserComment if there's form data
+                        if (metadata.workFront || metadata.coronation || metadata.activityPerformed || metadata.observationCategory) {
+                            // Handle the encoding of the user comment
+                            let userComment;
+                            if (piexif.helper && piexif.helper.encodeToUnicode) {
+                                userComment = piexif.helper.encodeToUnicode(JSON.stringify(metadata));
+                            } else {
+                                // Fallback: try to use the simpler ASCII encoding
+                                // First, ensure metadata is properly stringified and encode safely
+                                const metadataStr = JSON.stringify(metadata);
+                                // Convert the string to a format that piexif can handle
+                                userComment = "ASCII\0" + metadataStr;
+                            }
+                            
+                            exifObj["Exif"][piexif.ExifIFD.UserComment] = userComment;
+                            console.log("UserComment agregado al objeto EXIF.");
+                        } else {
+                            console.log("Sin datos de formulario, omitiendo UserComment.");
+                        }
+
+                        if (metadata.location) {
+                            console.log("Agregando datos GPS...");
+                            const lat = metadata.location.latitude;
+                            const lng = metadata.location.longitude;
+                            const latRef = lat >= 0 ? "N" : "S";
+                            const lngRef = lng >= 0 ? "E" : "W";
+                            const absLat = Math.abs(lat);
+                            const absLng = Math.abs(lng);
+                            
+                            // Improve precision by using higher precision rational values
+                            // Calculate degrees, minutes, and seconds with higher precision
+                            const latDeg = Math.floor(absLat);
+                            const latMinDecimal = (absLat - latDeg) * 60;
+                            const latMin = Math.floor(latMinDecimal);
+                            const latSec = (latMinDecimal - latMin) * 60;
+                            
+                            const lngDeg = Math.floor(absLng);
+                            const lngMinDecimal = (absLng - lngDeg) * 60;
+                            const lngMin = Math.floor(lngMinDecimal);
+                            const lngSec = (lngMinDecimal - lngMin) * 60;
+
+                            exifObj["GPS"] = {
+                                [piexif.GPSIFD.GPSVersionID]: [2, 2, 0, 0],
+                                [piexif.GPSIFD.GPSLatitudeRef]: latRef,
+                                [piexif.GPSIFD.GPSLatitude]: [
+                                    [latDeg, 1], 
+                                    [latMin, 1], 
+                                    [Math.round(latSec * 10000), 10000]  // Increased precision to 4 decimal places
+                                ],
+                                [piexif.GPSIFD.GPSLongitudeRef]: lngRef,
+                                [piexif.GPSIFD.GPSLongitude]: [
+                                    [lngDeg, 1], 
+                                    [lngMin, 1], 
+                                    [Math.round(lngSec * 10000), 10000]  // Increased precision to 4 decimal places
+                                ]
+                            };
+
+                            if (metadata.location.altitude !== null && metadata.location.altitude !== undefined) {
+                                const alt = Math.abs(metadata.location.altitude);
+                                const altRef = metadata.location.altitude >= 0 ? 0 : 1;
+                                exifObj["GPS"][piexif.GPSIFD.GPSAltitudeRef] = altRef;
+                                exifObj["GPS"][piexif.GPSIFD.GPSAltitude] = [Math.round(alt * 10000), 10000]; // Increased precision
+                            }
+                            console.log("Datos GPS agregados:", exifObj["GPS"]);
+                        }
+
+                        const now = new Date();
+                        const dateTimeOriginal = now.getFullYear() + ":" + 
+                            String(now.getMonth() + 1).padStart(2, '0') + ":" + 
+                            String(now.getDate()).padStart(2, '0') + " " +
+                            String(now.getHours()).padStart(2, '0') + ":" + 
+                            String(now.getMinutes()).padStart(2, '0') + ":" + 
+                            String(now.getSeconds()).padStart(2, '0');
+                        exifObj["Exif"][piexif.ExifIFD.DateTimeOriginal] = dateTimeOriginal;
+                        exifObj["0th"][piexif.ImageIFD.DateTime] = dateTimeOriginal;
+                        console.log("Objeto EXIF final antes de 'dump':", JSON.parse(JSON.stringify(exifObj)));
+
+                        const exifBytes = piexif.dump(exifObj);
+                        console.log("EXIF data convertido a bytes.");
+
+                        const newImage = piexif.insert(exifBytes, timestampedImage);
+                        console.log("Nueva imagen creada con EXIF data insertado.");
+
+                        photoWithMetadata = newImage;
+                        photoPreview.src = newImage;
+                        formSection.classList.add('hidden');
+                        resultSection.classList.remove('hidden');
+                        showStatus('¡Foto guardada con metadatos!', 'success');
+                        // Reset both buttons if they exist
+                        if (saveMetadataBtn) {
+                            saveMetadataBtn.innerHTML = 'Guardar Foto con Metadatos';
+                            saveMetadataBtn.disabled = false;
+                        }
+                        const saveWithoutFormBtn = document.getElementById('save-photo-without-form');
+                        if (saveWithoutFormBtn) {
+                            saveWithoutFormBtn.innerHTML = 'Guardar Foto sin Formulario';
+                            saveWithoutFormBtn.disabled = false;
+                        }
+
+                    } catch (err) {
+                        console.error('Error en addMetadataToImage:', err);
+                        showStatus('Error al guardar los metadatos.', 'error');
+                        // Reset both buttons if they exist
+                        if (saveMetadataBtn) {
+                            saveMetadataBtn.innerHTML = 'Guardar Foto con Metadatos';
+                            saveMetadataBtn.disabled = false;
+                        }
+                        const saveWithoutFormBtn = document.getElementById('save-photo-without-form');
+                        if (saveWithoutFormBtn) {
+                            saveWithoutFormBtn.innerHTML = 'Guardar Foto sin Formulario';
+                            saveWithoutFormBtn.disabled = false;
+                        }
                     }
-
-                    const now = new Date();
-                    const dateTimeOriginal = now.getFullYear() + ":" + 
-                        String(now.getMonth() + 1).padStart(2, '0') + ":" + 
-                        String(now.getDate()).padStart(2, '0') + " " +
-                        String(now.getHours()).padStart(2, '0') + ":" + 
-                        String(now.getMinutes()).padStart(2, '0') + ":" + 
-                        String(now.getSeconds()).padStart(2, '0');
-                    exifObj["Exif"][piexif.ExifIFD.DateTimeOriginal] = dateTimeOriginal;
-                    exifObj["0th"][piexif.ImageIFD.DateTime] = dateTimeOriginal;
-                    console.log("Objeto EXIF final antes de 'dump':", JSON.parse(JSON.stringify(exifObj)));
-
-                    const exifBytes = piexif.dump(exifObj);
-                    console.log("EXIF data convertido a bytes.");
-
-                    const newImage = piexif.insert(exifBytes, imageDataUrl);
-                    console.log("Nueva imagen creada con EXIF data insertado.");
-
-                    photoWithMetadata = newImage;
-                    photoPreview.src = newImage;
-                    formSection.classList.add('hidden');
-                    resultSection.classList.remove('hidden');
-                    showStatus('¡Foto guardada con metadatos!', 'success');
-                    saveMetadataBtn.innerHTML = 'Guardar Foto con Metadatos';
-                    saveMetadataBtn.disabled = false;
-
-                } catch (err) {
-                    console.error('Error en addMetadataToImage:', err);
-                    showStatus('Error al guardar los metadatos.', 'error');
+                } else {
+                    console.warn('piexif no está disponible.');
+                    showStatus('La librería para metadatos no está disponible.', 'error');
+                }
+            } catch (error) {
+                console.error('Error al dibujar timestamp en la imagen:', error);
+                showStatus('Error al procesar la imagen.', 'error');
+                // Reset both buttons if they exist
+                if (saveMetadataBtn) {
                     saveMetadataBtn.innerHTML = 'Guardar Foto con Metadatos';
                     saveMetadataBtn.disabled = false;
                 }
-            } else {
-                console.warn('piexif no está disponible.');
-                showStatus('La librería para metadatos no está disponible.', 'error');
+                const saveWithoutFormBtn = document.getElementById('save-photo-without-form');
+                if (saveWithoutFormBtn) {
+                    saveWithoutFormBtn.innerHTML = 'Guardar Foto sin Formulario';
+                    saveWithoutFormBtn.disabled = false;
+                }
             }
         }
         
@@ -395,6 +562,15 @@
             }, 3000);
         }
         
+        // Función para iniciar la cámara automáticamente al cargar la página
+        function autoStartCamera() {
+            // Solo iniciar la cámara si no hay una secuencia activa
+            if (!stream) {
+                // Simular clic en el botón de iniciar cámara
+                startCameraBtn.click();
+            }
+        }
+
         // Verificar soporte de Service Worker
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
@@ -407,6 +583,9 @@
                     });
             });
         }
+        
+        // Iniciar cámara automáticamente al cargar la página
+        window.addEventListener('load', autoStartCamera);
 
         // Modal de metadatos
         const viewMetadataBtn = document.getElementById('view-metadata');
@@ -451,12 +630,66 @@
                 // Display GPS data
                 if (exifObj.GPS && Object.keys(exifObj.GPS).length > 0) {
                     metadataText += 'Datos GPS:\n';
+                    
+                    // Get GPS coordinates
+                    let lat = null, lng = null;
+                    let latRef = null, lngRef = null;
+                    
                     for (const tag in exifObj.GPS) {
                         const tagName = piexif.GPSIFD[tag] || `Unknown Tag (${tag})`;
-                        metadataText += `${tagName}: ${exifObj.GPS[tag]}\n`;
+                        
+                        // Process GPS coordinates
+                        if (tag == piexif.GPSIFD.GPSLatitude) {
+                            const gpsLat = exifObj.GPS[tag];
+                            if (Array.isArray(gpsLat) && gpsLat.length === 3) {
+                                // Calculate decimal degrees from DMS
+                                const deg = gpsLat[0][0] / gpsLat[0][1];
+                                const min = gpsLat[1][0] / gpsLat[1][1];
+                                const sec = gpsLat[2][0] / gpsLat[2][1];
+                                lat = deg + (min / 60) + (sec / 3600);
+                            }
+                            metadataText += `${tagName}: ${exifObj.GPS[tag]}\n`;
+                        } else if (tag == piexif.GPSIFD.GPSLongitude) {
+                            const gpsLng = exifObj.GPS[tag];
+                            if (Array.isArray(gpsLng) && gpsLng.length === 3) {
+                                // Calculate decimal degrees from DMS
+                                const deg = gpsLng[0][0] / gpsLng[0][1];
+                                const min = gpsLng[1][0] / gpsLng[1][1];
+                                const sec = gpsLng[2][0] / gpsLng[2][1];
+                                lng = deg + (min / 60) + (sec / 3600);
+                            }
+                            metadataText += `${tagName}: ${exifObj.GPS[tag]}\n`;
+                        } else if (tag == piexif.GPSIFD.GPSLatitudeRef) {
+                            latRef = exifObj.GPS[tag];
+                            metadataText += `${tagName}: ${exifObj.GPS[tag]}\n`;
+                        } else if (tag == piexif.GPSIFD.GPSLongitudeRef) {
+                            lngRef = exifObj.GPS[tag];
+                            metadataText += `${tagName}: ${exifObj.GPS[tag]}\n`;
+                        } else {
+                            // For other GPS tags, just display as is
+                            metadataText += `${tagName}: ${exifObj.GPS[tag]}\n`;
+                        }
+                    }
+                    
+                    // Display calculated coordinates if available
+                    if (lat !== null && lng !== null && latRef && lngRef) {
+                        const latSign = latRef === 'S' ? -1 : 1;
+                        const lngSign = lngRef === 'W' ? -1 : 1;
+                        const calculatedLat = (lat * latSign).toFixed(8);
+                        const calculatedLng = (lng * lngSign).toFixed(8);
+                        metadataText += `\nCoordenadas calculadas:\n`;
+                        metadataText += `Latitud: ${calculatedLat}°\n`;
+                        metadataText += `Longitud: ${calculatedLng}°\n`;
                     }
                 } else {
                     metadataText += 'No se encontraron datos GPS en los metadatos.\n';
+                }
+                
+                // Display DateTime
+                if (exifObj.Exif && exifObj.Exif[piexif.ExifIFD.DateTimeOriginal]) {
+                    metadataText += `\nFecha y Hora Original: ${exifObj.Exif[piexif.ExifIFD.DateTimeOriginal]}\n`;
+                } else if (exifObj['0th'] && exifObj['0th'][piexif.ImageIFD.DateTime]) {
+                    metadataText += `\nFecha y Hora: ${exifObj['0th'][piexif.ImageIFD.DateTime]}\n`;
                 }
 
                 metadataDisplay.textContent = metadataText;
