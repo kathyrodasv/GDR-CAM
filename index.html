@@ -10,7 +10,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>GDR-CAM - Aplicación de Captura de Fotos V11</h1>
+        <h1>GDR-CAM - Aplicación de Captura de Fotos V12</h1>
         
         <div id="camera-section">
             <div class="video-container">
@@ -114,20 +114,39 @@
         // Iniciar cámara
         startCameraBtn.addEventListener('click', async () => {
             try {
-                // Primero intentar con cámara trasera (environment)
+                // Primero intentar con cámara trasera (environment) a máxima resolución
                 const constraints = { 
-                    video: { facingMode: 'environment' } 
+                    video: { 
+                        facingMode: 'environment',
+                        width: { ideal: 4096 },  // Máxima resolución disponible
+                        height: { ideal: 2160 },
+                        aspectRatio: { ideal: 16/9 }
+                    } 
                 };
                 
                 try {
                     stream = await navigator.mediaDevices.getUserMedia(constraints);
                 } catch (environmentError) {
-                    console.warn('No se pudo acceder a la cámara trasera, intentando con cámara frontal:', environmentError);
-                    // Si falla, intentar con cámara frontal
-                    const constraintsAlt = { 
-                        video: { facingMode: 'user' } 
-                    };
-                    stream = await navigator.mediaDevices.getUserMedia(constraintsAlt);
+                    console.warn('No se pudo acceder a la cámara trasera a máxima resolución, intentando con resolución predeterminada:', environmentError);
+                    // Si falla, intentar con cámara trasera a resolución predeterminada
+                    try {
+                        const constraintsFallback = { 
+                            video: { facingMode: 'environment' } 
+                        };
+                        stream = await navigator.mediaDevices.getUserMedia(constraintsFallback);
+                    } catch (fallbackError) {
+                        console.warn('No se pudo acceder a la cámara trasera, intentando con cámara frontal:', fallbackError);
+                        // Si falla, intentar con cámara frontal
+                        const constraintsAlt = { 
+                            video: { 
+                                facingMode: 'user',
+                                width: { ideal: 4096 },  // Máxima resolución disponible
+                                height: { ideal: 2160 },
+                                aspectRatio: { ideal: 16/9 }
+                            } 
+                        };
+                        stream = await navigator.mediaDevices.getUserMedia(constraintsAlt);
+                    }
                 }
                 
                 video.srcObject = stream;
@@ -190,11 +209,19 @@
         takePhotoBtn.addEventListener('click', () => {
             const processImage = (imageSource) => {
                 const canvas = document.createElement('canvas');
-                canvas.width = imageSource.videoWidth || imageSource.width;
-                canvas.height = imageSource.videoHeight || imageSource.height;
+                // Usar las dimensiones reales del video/fuente para máxima calidad
+                const width = imageSource.videoWidth || imageSource.width;
+                const height = imageSource.videoHeight || imageSource.height;
+                
+                canvas.width = width;
+                canvas.height = height;
                 const context = canvas.getContext('2d');
-                context.drawImage(imageSource, 0, 0, canvas.width, canvas.height);
-                capturedPhotoDataUrl = canvas.toDataURL('image/jpeg', 0.95);
+                
+                // Dibujar la imagen con calidad máxima
+                context.drawImage(imageSource, 0, 0, width, height);
+                
+                // Capturar con calidad máxima (98%)
+                capturedPhotoDataUrl = canvas.toDataURL('image/jpeg', 0.98);
 
                 video.srcObject = null;
                 if (stream) {
@@ -208,7 +235,14 @@
             };
 
             if (imageCapture) {
-                imageCapture.takePhoto()
+                // Configurar opciones para máxima calidad de la imagen capturada
+                const photoSettings = {
+                    imageWidth: 4096,  // Máxima resolución
+                    imageHeight: 2160,
+                    fillLightMode: 'auto'  // Ajustar según condiciones de luz
+                };
+                
+                imageCapture.takePhoto(photoSettings)
                     .then(blob => {
                         const image = new Image();
                         image.src = URL.createObjectURL(blob);
@@ -218,7 +252,20 @@
                     })
                     .catch(error => {
                         console.error('Error taking photo:', error);
-                        showStatus('Error al tomar la foto.', 'error');
+                        console.log('Intentando con configuración predeterminada...');
+                        // Si falla con configuración de alta resolución, intentar con predeterminada
+                        imageCapture.takePhoto()
+                            .then(blob => {
+                                const image = new Image();
+                                image.src = URL.createObjectURL(blob);
+                                image.onload = () => {
+                                    processImage(image);
+                                };
+                            })
+                            .catch(error2 => {
+                                console.error('Error tomando foto con configuración predeterminada:', error2);
+                                showStatus('Error al tomar la foto.', 'error');
+                            });
                     });
             } else {
                 processImage(video);
@@ -318,24 +365,89 @@
             return new Promise((resolve, reject) => {
                 const img = new Image();
                 img.onload = function() {
-                    // Cargar el logo
+                    // Determinar la orientación actual del dispositivo
+                    const orientation = getOrientation();
+                    
+                    // Cargar el logo con alta calidad
                     const logo = new Image();
+                    logo.crossOrigin = "Anonymous"; // Evitar problemas de CORS
                     logo.onload = function() {
+                        // Crear canvas considerando la orientación original
                         const canvas = document.createElement('canvas');
-                        canvas.width = img.width;
-                        canvas.height = img.height;
-                        const ctx = canvas.getContext('2d');
+                        let ctx;
                         
-                        // Dibujar la imagen original
-                        ctx.drawImage(img, 0, 0);
+                        // Dibujar la imagen con la orientación correcta
+                        if (orientation === 6 || orientation === 8) {
+                            // Si la orientación es 90° o 270° (6 o 8), intercambiar dimensiones
+                            canvas.width = img.height;
+                            canvas.height = img.width;
+                            ctx = canvas.getContext('2d');
+                            
+                            // Rotar y dibujar la imagen según la orientación
+                            if (orientation === 6) { // 90° clockwise
+                                ctx.translate(canvas.width, 0);
+                                ctx.rotate(90 * Math.PI / 180);
+                            } else if (orientation === 8) { // 90° counterclockwise
+                                ctx.translate(0, canvas.height);
+                                ctx.rotate(-90 * Math.PI / 180);
+                            }
+                            
+                            // Dibujar la imagen original (ahora rotada)
+                            ctx.drawImage(img, 0, 0);
+                        } else if (orientation === 3) { // 180°
+                            canvas.width = img.width;
+                            canvas.height = img.height;
+                            ctx = canvas.getContext('2d');
+                            
+                            ctx.translate(canvas.width, canvas.height);
+                            ctx.rotate(180 * Math.PI / 180);
+                            ctx.drawImage(img, 0, 0);
+                        } else {
+                            // Orientación normal (1) o no reconocida, usar dimensiones normales
+                            canvas.width = img.width;
+                            canvas.height = img.height;
+                            ctx = canvas.getContext('2d');
+                            ctx.drawImage(img, 0, 0);
+                        }
                         
-                        // Dibujar el logo en la esquina inferior izquierda
-                        const logoPadding = 10; // Espacio desde los bordes
-                        const logoHeight = 40; // Altura fija para el logo
+                        // Habilitar alta calidad para la interpolación de imágenes
+                        ctx.imageSmoothingEnabled = true;
+                        ctx.imageSmoothingQuality = 'high';
+                        
+                        // Dibujar el logo en la esquina inferior izquierda (después de rotación)
+                        const logoPadding = 12; // Ajustar espacio para mejor calidad
+                        const logoHeight = 60; // Aumentar altura para mejor calidad
                         const logoAspectRatio = logo.width / logo.height;
                         const logoWidth = logoHeight * logoAspectRatio;
                         
-                        ctx.drawImage(logo, logoPadding, canvas.height - logoHeight - logoPadding, logoWidth, logoHeight);
+                        // Dibujar logo en la posición estándar (abajo izquierda)
+                        // Ajuste: si la imagen está rotada 90° o 270°, cambiar posición
+                        if (orientation === 6) { // 90° clockwise
+                            ctx.drawImage(
+                                logo, 
+                                canvas.width - logoHeight - logoPadding, 
+                                logoPadding, 
+                                logoHeight, 
+                                logoWidth
+                            );
+                        } else if (orientation === 8) { // 90° counterclockwise
+                            ctx.drawImage(
+                                logo, 
+                                logoPadding, 
+                                canvas.height - logoHeight - logoPadding, 
+                                logoHeight, 
+                                logoWidth
+                            );
+                        } else {
+                            // Orientación normal o 180°
+                            ctx.drawImage(
+                                logo, 
+                                logoPadding, 
+                                canvas.height - logoHeight - logoPadding, 
+                                logoWidth, 
+                                logoHeight
+                            );
+                        }
                         
                         // Configurar estilo del texto
                         ctx.font = '16px Arial';
@@ -343,15 +455,30 @@
                         ctx.textAlign = 'right';
                         ctx.textBaseline = 'bottom';
                         
-                        // Dibujar la fecha y hora en la esquina inferior derecha
-                        ctx.fillText(timestamp, canvas.width - 10, canvas.height - 10);
+                        // Dibujar la fecha y hora en la esquina inferior derecha (después de rotación)
+                        if (orientation === 6) { // 90° clockwise
+                            ctx.fillText(timestamp, canvas.width - 10, logoHeight + 20);
+                        } else if (orientation === 8) { // 90° counterclockwise
+                            ctx.fillText(timestamp, logoHeight + 15, canvas.height - 10);
+                        } else {
+                            // Orientación normal o 180°
+                            ctx.fillText(timestamp, canvas.width - 10, canvas.height - 10);
+                        }
                         
                         // Agregar sombra para mejor visibilidad
                         ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
                         ctx.shadowBlur = 3;
                         ctx.shadowOffsetX = 1;
                         ctx.shadowOffsetY = 1;
-                        ctx.fillText(timestamp, canvas.width - 10, canvas.height - 10);
+                        
+                        if (orientation === 6) { // 90° clockwise
+                            ctx.fillText(timestamp, canvas.width - 10, logoHeight + 20);
+                        } else if (orientation === 8) { // 90° counterclockwise
+                            ctx.fillText(timestamp, logoHeight + 15, canvas.height - 10);
+                        } else {
+                            // Orientación normal o 180°
+                            ctx.fillText(timestamp, canvas.width - 10, canvas.height - 10);
+                        }
                         
                         // Restablecer la sombra
                         ctx.shadowColor = 'transparent';
@@ -360,17 +487,55 @@
                         ctx.shadowOffsetY = 0;
                         
                         // Devolver la imagen con el texto y logo como data URL con mayor calidad
-                        resolve(canvas.toDataURL('image/jpeg', 0.95));
+                        resolve(canvas.toDataURL('image/jpeg', 0.98));
                     };
                     logo.onerror = function() {
                         // Si no se puede cargar el logo, continuar solo con el timestamp
-                        const canvas = document.createElement('canvas');
-                        canvas.width = img.width;
-                        canvas.height = img.height;
-                        const ctx = canvas.getContext('2d');
+                        console.warn('No se pudo cargar el logo, continuando sin él');
                         
-                        // Dibujar la imagen original
-                        ctx.drawImage(img, 0, 0);
+                        // Determinar la orientación actual del dispositivo
+                        const orientation = getOrientation();
+                        
+                        const canvas = document.createElement('canvas');
+                        let ctx;
+                        
+                        // Dibujar la imagen con la orientación correcta
+                        if (orientation === 6 || orientation === 8) {
+                            // Si la orientación es 90° o 270° (6 o 8), intercambiar dimensiones
+                            canvas.width = img.height;
+                            canvas.height = img.width;
+                            ctx = canvas.getContext('2d');
+                            
+                            // Rotar y dibujar la imagen según la orientación
+                            if (orientation === 6) { // 90° clockwise
+                                ctx.translate(canvas.width, 0);
+                                ctx.rotate(90 * Math.PI / 180);
+                            } else if (orientation === 8) { // 90° counterclockwise
+                                ctx.translate(0, canvas.height);
+                                ctx.rotate(-90 * Math.PI / 180);
+                            }
+                            
+                            // Dibujar la imagen original (ahora rotada)
+                            ctx.drawImage(img, 0, 0);
+                        } else if (orientation === 3) { // 180°
+                            canvas.width = img.width;
+                            canvas.height = img.height;
+                            ctx = canvas.getContext('2d');
+                            
+                            ctx.translate(canvas.width, canvas.height);
+                            ctx.rotate(180 * Math.PI / 180);
+                            ctx.drawImage(img, 0, 0);
+                        } else {
+                            // Orientación normal (1) o no reconocida, usar dimensiones normales
+                            canvas.width = img.width;
+                            canvas.height = img.height;
+                            ctx = canvas.getContext('2d');
+                            ctx.drawImage(img, 0, 0);
+                        }
+                        
+                        // Habilitar alta calidad para la interpolación de imágenes
+                        ctx.imageSmoothingEnabled = true;
+                        ctx.imageSmoothingQuality = 'high';
                         
                         // Configurar estilo del texto
                         ctx.font = '16px Arial';
@@ -378,15 +543,30 @@
                         ctx.textAlign = 'right';
                         ctx.textBaseline = 'bottom';
                         
-                        // Dibujar la fecha y hora en la esquina inferior derecha
-                        ctx.fillText(timestamp, canvas.width - 10, canvas.height - 10);
+                        // Dibujar la fecha y hora en la esquina inferior derecha (después de rotación)
+                        if (orientation === 6) { // 90° clockwise
+                            ctx.fillText(timestamp, canvas.width - 10, 20);
+                        } else if (orientation === 8) { // 90° counterclockwise
+                            ctx.fillText(timestamp, 15, canvas.height - 10);
+                        } else {
+                            // Orientación normal o 180°
+                            ctx.fillText(timestamp, canvas.width - 10, canvas.height - 10);
+                        }
                         
                         // Agregar sombra para mejor visibilidad
                         ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
                         ctx.shadowBlur = 3;
                         ctx.shadowOffsetX = 1;
                         ctx.shadowOffsetY = 1;
-                        ctx.fillText(timestamp, canvas.width - 10, canvas.height - 10);
+                        
+                        if (orientation === 6) { // 90° clockwise
+                            ctx.fillText(timestamp, canvas.width - 10, 20);
+                        } else if (orientation === 8) { // 90° counterclockwise
+                            ctx.fillText(timestamp, 15, canvas.height - 10);
+                        } else {
+                            // Orientación normal o 180°
+                            ctx.fillText(timestamp, canvas.width - 10, canvas.height - 10);
+                        }
                         
                         // Restablecer la sombra
                         ctx.shadowColor = 'transparent';
@@ -395,7 +575,7 @@
                         ctx.shadowOffsetY = 0;
                         
                         // Devolver la imagen con el texto como data URL con mayor calidad
-                        resolve(canvas.toDataURL('image/jpeg', 0.95));
+                        resolve(canvas.toDataURL('image/jpeg', 0.98));
                     };
                     logo.src = 'img/LOGO GDR.jpeg'; // Ruta al logo
                 };
@@ -504,9 +684,8 @@
                         exifObj["Exif"][piexif.ExifIFD.DateTimeOriginal] = dateTimeOriginal;
                         exifObj["0th"][piexif.ImageIFD.DateTime] = dateTimeOriginal;
                         
-                        // Agregar información de orientación
-                        const orientation = getOrientation();
-                        exifObj["0th"][piexif.ImageIFD.Orientation] = orientation;
+                        // No agregamos el tag de orientación porque ya aplicamos la rotación al canvas
+                        // exifObj["0th"][piexif.ImageIFD.Orientation] = 1; // Considerar la imagen como orientación normal
                         console.log("Objeto EXIF final antes de 'dump':", JSON.parse(JSON.stringify(exifObj)));
 
                         const exifBytes = piexif.dump(exifObj);
