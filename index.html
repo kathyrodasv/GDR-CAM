@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GDR-CAM - Aplicación de Captura de Fotos</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📷</text></svg>">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .container {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-top: 0;
+        }
+        
+        .video-container {
+            position: relative;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+        
+        video {
+            width: 100%;
+            max-width: 500px;
+            height: auto;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            display: block;
+            margin: 0 auto;
+        }
+        
+        canvas {
+            display: none;
+        }
+        
+        .controls {
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 0 10px;
+        }
+        
+        button:hover {
+            background-color: #45a049;
+        }
+        
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        
+        .result-container {
+            margin-top: 20px;
+        }
+        
+        img {
+            max-width: 100%;
+            height: auto;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            display: block;
+            margin: 0 auto;
+        }
+        
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            text-align: center;
+        }
+        
+        .status.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .action-buttons {
+            text-align: center;
+            margin-top: 15px;
+        }
+        
+        @media (max-width: 600px) {
+            body {
+                padding: 10px;
+            }
+            
+            .container {
+                padding: 15px;
+            }
+            
+            button {
+                display: block;
+                width: 100%;
+                margin: 10px 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>GDR-CAM - Aplicación de Captura de Fotos</h1>
+        
+        <div id="camera-section">
+            <div class="video-container">
+                <video id="video" autoplay playsinline></video>
+                <canvas id="canvas" width="640" height="480"></canvas>
+            </div>
+            
+            <div class="controls">
+                <button id="start-camera">Iniciar Cámara</button>
+                <button id="take-photo" disabled>Tomar Foto</button>
+            </div>
+        </div>
+        
+        <div id="form-section" class="hidden">
+            <h2>Formulario de Observación</h2>
+            
+            <div class="form-group">
+                <label for="work-front">Frente de Trabajo:</label>
+                <input type="text" id="work-front" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="coronation">Coronamiento:</label>
+                <input type="text" id="coronation" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="observation-type">Tipo de Observación:</label>
+                <select id="observation-type" required>
+                    <option value="">Seleccione una opción</option>
+                    <option value="estructural">Estructural</option>
+                    <option value="ambiental">Ambiental</option>
+                    <option value="geotecnica">Geotécnica</option>
+                    <option value="otro">Otro</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="activity-performed">Actividad Realizada:</label>
+                <textarea id="activity-performed" rows="4" required></textarea>
+            </div>
+            
+            <div class="action-buttons">
+                <button id="save-metadata">Guardar Foto con Metadatos</button>
+            </div>
+        </div>
+        
+        <div id="result-section" class="result-container hidden">
+            <h2>Foto Capturada</h2>
+            <img id="photo-preview" src="" alt="Vista previa de la foto">
+            <div class="action-buttons">
+                <button id="new-capture">Nueva Captura</button>
+                <button id="download-photo">Descargar Foto</button>
+            </div>
+        </div>
+        
+        <div id="status-message" class="status hidden"></div>
+    </div>
+
+    <script>
+        // Variables para elementos del DOM
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const startCameraBtn = document.getElementById('start-camera');
+        const takePhotoBtn = document.getElementById('take-photo');
+        const formSection = document.getElementById('form-section');
+        const resultSection = document.getElementById('result-section');
+        const photoPreview = document.getElementById('photo-preview');
+        const saveMetadataBtn = document.getElementById('save-metadata');
+        const newCaptureBtn = document.getElementById('new-capture');
+        const downloadPhotoBtn = document.getElementById('download-photo');
+        const cameraSection = document.getElementById('camera-section');
+        const statusMessage = document.getElementById('status-message');
+        
+        let stream = null;
+        let capturedPhotoDataUrl = null;
+        
+        // Iniciar cámara
+        startCameraBtn.addEventListener('click', async () => {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: 'environment' } // Preferir cámara trasera si está disponible
+                });
+                
+                video.srcObject = stream;
+                takePhotoBtn.disabled = false;
+                startCameraBtn.disabled = true;
+                showStatus('Cámara iniciada. Puede tomar una foto.', 'success');
+            } catch (err) {
+                console.error('Error al acceder a la cámara:', err);
+                showStatus('Error al acceder a la cámara. Asegúrese de permitir el acceso.', 'error');
+            }
+        });
+        
+        // Tomar foto
+        takePhotoBtn.addEventListener('click', () => {
+            const context = canvas.getContext('2d');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            capturedPhotoDataUrl = canvas.toDataURL('image/jpeg');
+            video.srcObject = null;
+            
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+            
+            // Mostrar el formulario
+            cameraSection.classList.add('hidden');
+            formSection.classList.remove('hidden');
+            
+            takePhotoBtn.disabled = true;
+            startCameraBtn.disabled = false;
+        });
+        
+        // Guardar foto con metadatos
+        saveMetadataBtn.addEventListener('click', () => {
+            const workFront = document.getElementById('work-front').value;
+            const coronation = document.getElementById('coronation').value;
+            const observationType = document.getElementById('observation-type').value;
+            const activityPerformed = document.getElementById('activity-performed').value;
+            
+            if (!workFront || !coronation || !observationType || !activityPerformed) {
+                showStatus('Por favor complete todos los campos del formulario.', 'error');
+                return;
+            }
+            
+            // En una implementación real, aquí se integraría la librería EXIF para agregar metadatos
+            // Por ahora, simplemente mostramos la foto con los datos capturados
+            
+            photoPreview.src = capturedPhotoDataUrl;
+            
+            // Mostrar sección de resultados
+            formSection.classList.add('hidden');
+            resultSection.classList.remove('hidden');
+            
+            showStatus('¡Foto guardada con éxito!', 'success');
+        });
+        
+        // Nueva captura
+        newCaptureBtn.addEventListener('click', () => {
+            resultSection.classList.add('hidden');
+            cameraSection.classList.remove('hidden');
+            startCameraBtn.disabled = false;
+            takePhotoBtn.disabled = true;
+            
+            // Limpiar campos del formulario
+            document.getElementById('work-front').value = '';
+            document.getElementById('coronation').value = '';
+            document.getElementById('observation-type').value = '';
+            document.getElementById('activity-performed').value = '';
+        });
+        
+        // Descargar foto
+        downloadPhotoBtn.addEventListener('click', () => {
+            const link = document.createElement('a');
+            link.href = capturedPhotoDataUrl;
+            link.download = `gdr-cam-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.jpg`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            showStatus('Foto descargada', 'success');
+        });
+        
+        // Función para mostrar mensajes de estado
+        function showStatus(message, type) {
+            statusMessage.textContent = message;
+            statusMessage.className = `status ${type}`;
+            statusMessage.classList.remove('hidden');
+            
+            setTimeout(() => {
+                statusMessage.classList.add('hidden');
+            }, 3000);
+        }
+        
+        // Verificar soporte de Service Worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(registration => {
+                        console.log('ServiceWorker registrado con éxito:', registration);
+                    })
+                    .catch(error => {
+                        console.log('Error al registrar ServiceWorker:', error);
+                    });
+            });
+        }
+    </script>
+</body>
+</html>
