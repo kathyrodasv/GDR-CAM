@@ -16,7 +16,7 @@
     <div class="container-fluid">
         <header class="header">
             <img src="img/LOGO GDR.jpeg" alt="GDR Logo" class="logo">
-            <h1>GDR-CAM-V13</h1>
+            <h1>GDR-CAM-V14</h1>
         </header>
         
         <main class="main-content">
@@ -425,7 +425,7 @@
                         
                         // Dibujar el logo en la esquina inferior izquierda (después de rotación)
                         const logoPadding = 25; // Ajustar espacio para mayor tamaño
-                        const logoHeight = 160; // Doble del tamaño anterior
+                        const logoHeight = 320; // Doble del tamaño anterior
                         const logoAspectRatio = logo.width / logo.height;
                         const logoWidth = logoHeight * logoAspectRatio;
                         
@@ -460,9 +460,7 @@
                                 logoHeight
                             );
                         }
-                        
-                        // Configurar estilo del texto - tamaño duplicado
-                        ctx.font = '40px Arial';
+                        ctx.font = '80px Arial';
                         ctx.fillStyle = 'rgba(255, 255, 255, 0.9)'; // Blanco semi-transparente con mayor opacidad
                         ctx.textAlign = 'right';
                         ctx.textBaseline = 'bottom';
