@@ -1,9 +1,14 @@
 // GDR-CAM Service Worker
-const CACHE_NAME = 'gdr-cam-v9';
+const CACHE_NAME = 'gdr-cam-v11';
 const urlsToCache = [
   '/',
   '/index.html',
-  '/manifest.json'
+  '/manifest.json',
+  '/style.css',
+  '/piexif.js',
+  '/exif.js',
+  '/save-image.js',
+  '/img/LOGO GDR.jpeg'
 ];
 
 // Instalación del Service Worker

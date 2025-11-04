@@ -10,7 +10,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>GDR-CAM - Aplicación de Captura de Fotos V8</h1>
+        <h1>GDR-CAM - Aplicación de Captura de Fotos V11</h1>
         
         <div id="camera-section">
             <div class="video-container">
@@ -272,6 +272,47 @@
             addMetadataToImage(capturedPhotoDataUrl, metadata);
         });
         
+        // Función para obtener la orientación actual del dispositivo
+        function getOrientation() {
+            let orientation = 1; // Valor por defecto (no rotado)
+            
+            // Usar screen.orientation si está disponible
+            if (screen.orientation && screen.orientation.angle !== undefined) {
+                const angle = screen.orientation.angle;
+                switch(angle) {
+                    case 90:
+                        orientation = 6; // 90° clockwise
+                        break;
+                    case 180:
+                        orientation = 3; // 180°
+                        break;
+                    case 270:
+                        orientation = 8; // 90° counterclockwise
+                        break;
+                    default:
+                        orientation = 1; // 0°
+                }
+            } 
+            // Fallback para dispositivos que no soportan screen.orientation
+            else if (window.orientation !== undefined) {
+                switch(window.orientation) {
+                    case 90:
+                        orientation = 6; // 90° clockwise
+                        break;
+                    case -90:
+                        orientation = 8; // 90° counterclockwise
+                        break;
+                    case 180:
+                        orientation = 3; // 180°
+                        break;
+                    default:
+                        orientation = 1; // 0°
+                }
+            }
+            
+            return orientation;
+        }
+
         // Función para dibujar la fecha y hora y el logo en la imagen
         function drawTimestampAndLogoOnImage(imageDataUrl, timestamp) {
             return new Promise((resolve, reject) => {
@@ -462,6 +503,10 @@
                             String(now.getSeconds()).padStart(2, '0');
                         exifObj["Exif"][piexif.ExifIFD.DateTimeOriginal] = dateTimeOriginal;
                         exifObj["0th"][piexif.ImageIFD.DateTime] = dateTimeOriginal;
+                        
+                        // Agregar información de orientación
+                        const orientation = getOrientation();
+                        exifObj["0th"][piexif.ImageIFD.Orientation] = orientation;
                         console.log("Objeto EXIF final antes de 'dump':", JSON.parse(JSON.stringify(exifObj)));
 
                         const exifBytes = piexif.dump(exifObj);
