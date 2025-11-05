@@ -236,7 +236,16 @@ function attachEventListeners() {
 
 function rotateCamera() {
     appState.rotation = (appState.rotation + 90) % 360;
-    elements.video.style.transform = `rotate(${appState.rotation}deg)`;
+    const video = elements.video;
+    video.style.transform = `rotate(${appState.rotation}deg)`;
+
+    if (appState.rotation === 90 || appState.rotation === 270) {
+        const videoAspectRatio = video.videoWidth / video.videoHeight;
+        const scale = video.parentElement.offsetWidth / video.videoHeight;
+        video.style.transform = `rotate(${appState.rotation}deg) scale(${scale})`;
+    } else {
+        video.style.transform = `rotate(${appState.rotation}deg) scale(1)`;
+    }
 }
 
 // Start camera function
@@ -885,6 +894,9 @@ function newCapture() {
         elements.downloadPhotoBtn.disabled = false;
     }
     
+    appState.rotation = 0;
+    elements.video.style.transform = 'rotate(0deg) scale(1)';
+
     if (!appState.isCameraActive) {
         startCamera();
     }
@@ -1005,6 +1017,8 @@ function saveUsingDownloadAPI(imageUrl) {
         showStatus('Error al guardar la imagen.', 'error');
 
     } finally {
+
+        // Ensure the button is reset even if the download fails
 
         if (elements.downloadPhotoBtn.innerHTML.includes('Guardando...')) {
 
