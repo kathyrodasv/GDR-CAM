@@ -93,7 +93,13 @@ function attachEventListeners() {
             showStatus('No hay imagen para guardar', 'error');
             return;
         }
-        saveToGallery(appState.photoWithMetadata);
+        
+        // Update button state before calling saveToGallery
+        elements.downloadPhotoBtn.innerHTML = '<span class="loading"></span> Guardando...';
+        elements.downloadPhotoBtn.disabled = true;
+        
+        // Create our own implementation that can access the elements
+        saveToGalleryWithButtonHandling(appState.photoWithMetadata);
     });
     
     // Modal functionality
@@ -834,6 +840,45 @@ function showStatus(message, type) {
     setTimeout(() => {
         elements.statusMessage.classList.add('hidden');
     }, 3000);
+}
+
+// Function to save to gallery with proper button state handling
+async function saveToGalleryWithButtonHandling(imageUrl) {
+    try {
+        const response = await fetch(imageUrl);
+        const blob = await response.blob();
+        const filename = `gdr-cam-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.jpg`;
+        const file = new File([blob], filename, { type: blob.type });
+
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({
+                files: [file],
+                title: 'Guardar imagen',
+                text: 'Guardar la foto capturada en la galería.',
+            });
+            showStatus('La imagen se ha compartido con éxito.', 'success');
+        } else {
+            // Use the alternative download method
+            saveUsingDownloadAPI(imageUrl);
+            return; // Return early since saveUsingDownloadAPI handles its own button state
+        }
+    } catch (error) {
+        if (error.name !== 'AbortError') {
+            console.error('Error al compartir la imagen:', error);
+            showStatus('Error al guardar la imagen. Intentando método alternativo.', 'error');
+            saveUsingDownloadAPI(imageUrl);
+            return; // Return early since saveUsingDownloadAPI handles its own button state
+        } else {
+            showStatus('Guardado cancelado por el usuario.', 'success');
+        }
+    } finally {
+        // Only reset the button here if we didn't return early due to alternative methods
+        // that handle their own button state
+        if (elements.downloadPhotoBtn.innerHTML.includes('Guardando...')) {
+            elements.downloadPhotoBtn.innerHTML = 'Guardar en Galería';
+            elements.downloadPhotoBtn.disabled = false;
+        }
+    }
 }
 
 // Initialize the app when DOM is loaded

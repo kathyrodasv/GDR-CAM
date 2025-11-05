@@ -1,8 +1,5 @@
 // Función para guardar imagen en la galería del dispositivo
 async function saveToGallery(imageUrl) {
-    downloadPhotoBtn.innerHTML = '<span class="loading"></span> Guardando...';
-    downloadPhotoBtn.disabled = true;
-
     try {
         const response = await fetch(imageUrl);
         const blob = await response.blob();
@@ -27,9 +24,6 @@ async function saveToGallery(imageUrl) {
         } else {
             showStatus('Guardado cancelado por el usuario.', 'success');
         }
-    } finally {
-        downloadPhotoBtn.innerHTML = 'Guardar en Galería';
-        downloadPhotoBtn.disabled = false;
     }
 }
 
@@ -42,9 +36,26 @@ function saveUsingDownloadAPI(imageUrl) {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        showStatus('Imagen descargada a la carpeta de descargas.', 'success');
+        
+        // Attempt to reset the button if the global app elements are available
+        if (typeof elements !== 'undefined' && elements.downloadPhotoBtn) {
+            elements.downloadPhotoBtn.innerHTML = 'Guardar en Galería';
+            elements.downloadPhotoBtn.disabled = false;
+        }
+        
+        if (typeof showStatus !== 'undefined') {
+            showStatus('Imagen descargada a la carpeta de descargas.', 'success');
+        }
     } catch (error) {
         console.error('Error al guardar imagen con el método de descarga:', error);
-        showStatus('Error al guardar la imagen.', 'error');
+        if (typeof showStatus !== 'undefined') {
+            showStatus('Error al guardar la imagen.', 'error');
+        }
+        
+        // Attempt to reset the button if the global app elements are available
+        if (typeof elements !== 'undefined' && elements.downloadPhotoBtn) {
+            elements.downloadPhotoBtn.innerHTML = 'Guardar en Galería';
+            elements.downloadPhotoBtn.disabled = false;
+        }
     }
 }
