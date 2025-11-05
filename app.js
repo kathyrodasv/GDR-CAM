@@ -55,15 +55,46 @@ function init() {
     
     // Initialize camera automatically on page load
     window.addEventListener('load', () => {
-        // Verify service worker support and register
+        // Verify service worker support and register with better error handling
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('./sw.js')
-                .then(registration => {
-                    console.log('ServiceWorker registrado con éxito:', registration);
-                })
-                .catch(error => {
-                    console.log('Error al registrar ServiceWorker:', error);
-                });
+            // First, check if there's already a service worker registered
+            if (navigator.serviceWorker.controller) {
+                console.log('Service worker already active');
+            } else {
+                // Register the service worker
+                navigator.serviceWorker.register('./sw.js')
+                    .then(registration => {
+                        console.log('ServiceWorker registrado con éxito:', registration);
+                        
+                        // Listen for updates
+                        registration.onupdatefound = () => {
+                            const installingWorker = registration.installing;
+                            if (installingWorker) {
+                                installingWorker.onstatechange = () => {
+                                    if (installingWorker.state === 'installed') {
+                                        if (navigator.serviceWorker.controller) {
+                                            // New update available
+                                            console.log('New content is available, please refresh.');
+                                            showStatus('Nueva versión disponible. Actualice la página para usar la versión más reciente.', 'success');
+                                        } else {
+                                            // First install
+                                            console.log('Content is now available offline!');
+                                            showStatus('La aplicación está lista para uso offline.', 'success');
+                                        }
+                                    }
+                                };
+                            }
+                        };
+                    })
+                    .catch(error => {
+                        console.error('Error al registrar ServiceWorker:', error);
+                        // Show user-friendly message about offline functionality not being available
+                        showStatus('Funcionalidad offline no disponible. Verifique su conexión.', 'error');
+                    });
+            }
+        } else {
+            console.log('Service Worker no es soportado en este navegador');
+            showStatus('Service Worker no es compatible con su navegador. Algunas funciones pueden no estar disponibles.', 'error');
         }
         
         // Lock screen orientation to portrait if available
@@ -673,18 +704,24 @@ function correctImageOrientation(imageDataUrl) {
     });
 }
 
-// Function to draw date/time and logo on image ensuring labels remain horizontal
-function drawTimestampAndLogoOnImage(imageDataUrl, timestamp) {
+// Function to orient image correctly for preview (without timestamp/logo)
+function orientImageForPreview(imageDataUrl) {
     return new Promise(async (resolve, reject) => {
         const img = new Image();
         img.onload = async function() {
+            // Load EXIF data to check orientation
+            const imageOrientation = await getImageOrientation(imageDataUrl);
+            
+            // If the image has no rotation needed (orientation 1), return as is
+            if (!imageOrientation || imageOrientation === 1) {
+                resolve(imageDataUrl);
+                return;
+            }
+            
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
             
-            // Get the actual image orientation from EXIF data
-            const imageOrientation = await getImageOrientation(imageDataUrl);
-            
-            // Set canvas dimensions based on image orientation
+            // Set canvas dimensions based on orientation for proper rotation
             if (imageOrientation === 6 || imageOrientation === 8) { // 90° or 270° rotated
                 canvas.width = img.height;
                 canvas.height = img.width;
@@ -701,7 +738,7 @@ function drawTimestampAndLogoOnImage(imageDataUrl, timestamp) {
                     ctx.translate(canvas.width, 0);
                     ctx.scale(-1, 1);
                     break;
-                case 3: // 180° rotate left
+                case 3: // 180° rotate
                     ctx.translate(canvas.width, canvas.height);
                     ctx.rotate(Math.PI);
                     break;
@@ -711,42 +748,29 @@ function drawTimestampAndLogoOnImage(imageDataUrl, timestamp) {
                     break;
                 case 5: // Vertical flip + 90 rotate right
                     ctx.rotate(0.5 * Math.PI);
-                    ctx.scale(1, -1);
+                    ctx.translate(0, -canvas.height);
+                    ctx.scale(-1, 1);
                     break;
                 case 6: // 90° rotate right
                     ctx.rotate(0.5 * Math.PI);
-                    ctx.translate(0, -canvas.width);
+                    ctx.translate(0, -canvas.height);
                     break;
                 case 7: // Horizontal flip + 90 rotate right
                     ctx.rotate(0.5 * Math.PI);
-                    ctx.translate(canvas.height, -canvas.width);
-                    ctx.scale(-1, 1);
+                    ctx.translate(canvas.width, 0);
+                    ctx.scale(1, -1);
                     break;
-                case 8: // 90° rotate left
+                case 8: // 90° rotate left (counter-clockwise)
                     ctx.rotate(-0.5 * Math.PI);
-                    ctx.translate(-canvas.height, 0);
+                    ctx.translate(-canvas.width, 0);
                     break;
             }
 
             // Draw the image with correct orientation
             ctx.drawImage(img, 0, 0);
-
-            // Restore the context to its original state before adding text/logo
-            // This ensures text/logo will be drawn in horizontal orientation
             ctx.restore();
 
-            // Calculate dimensions for logo and text based on the original canvas dimensions
-            let canvasWidth, canvasHeight;
-            if (imageOrientation === 6 || imageOrientation === 8) { // 90° or 270° rotated
-                canvasWidth = img.height;
-                canvasHeight = img.width;
-            } else { // Normal or 180° rotated
-                canvasWidth = img.width;
-                canvasHeight = img.height;
-            }
-
-            // For the preview, we don't add the timestamp and logo immediately
-            // Instead, we'll add them later after the user confirms the orientation
+            // Convert canvas back to data URL
             resolve(canvas.toDataURL('image/jpeg', 0.98));
         };
         
@@ -764,13 +788,11 @@ async function addMetadataToImage(imageDataUrl, metadata) {
     console.log("imageDataUrl (first 100 characters):", imageDataUrl.slice(0, 100));
     
     try {
-        // Add the date and time as text on the image
-        const timestampedImage = await drawTimestampAndLogoOnImage(imageDataUrl, metadata.timestamp);
-        
         if (typeof piexif !== 'undefined' && piexif.dump) {
             try {
+                // Load EXIF data from the original image
                 console.log("Loading EXIF data from image...");
-                let exifObj = piexif.load(timestampedImage);
+                let exifObj = piexif.load(imageDataUrl);
                 console.log("EXIF data loaded:", JSON.parse(JSON.stringify(exifObj)));
 
                 if (!exifObj) {
@@ -875,15 +897,16 @@ async function addMetadataToImage(imageDataUrl, metadata) {
                 const exifBytes = piexif.dump(exifObj);
                 console.log("EXIF data converted to bytes.");
 
-                const newImage = piexif.insert(exifBytes, timestampedImage);
+                const newImage = piexif.insert(exifBytes, imageDataUrl);
                 console.log("New image created with inserted EXIF data.");
 
-                appState.photoWithMetadata = newImage;
-                appState.originalPhotoWithMetadata = newImage; // Store original for rotation
-                elements.photoPreview.src = newImage;
+                // Orient the image correctly for preview
+                const orientedImage = await orientImageForPreview(newImage);
                 
-                // If the preview image is not correctly oriented for display, we may need to correct it specifically for the preview
-                // The image should already be corrected by drawTimestampAndLogoOnImage, but let's ensure preview shows correctly
+                appState.photoWithMetadata = orientedImage;
+                appState.originalPhotoWithMetadata = newImage; // Store original for rotation
+                elements.photoPreview.src = orientedImage;
+                
                 elements.formSection.classList.add('hidden');
                 elements.resultSection.classList.remove('hidden');
                 showStatus('¡Foto guardada con metadatos! Confirme la orientación y guarde en galería.', 'success');
@@ -917,7 +940,7 @@ async function addMetadataToImage(imageDataUrl, metadata) {
             showStatus('La biblioteca para metadatos no está disponible.', 'error');
         }
     } catch (error) {
-        console.error('Error drawing timestamp on image:', error);
+        console.error('Error processing image:', error);
         showStatus('Error al procesar la imagen: ' + error.message, 'error');
         
         // Reset both buttons if they exist
@@ -941,8 +964,8 @@ async function rotateImage(angle) {
 
     const img = new Image();
     img.onload = async function() {
-        // Load the EXIF data from the current image to preserve it
-        const exifObj = piexif.load(appState.photoWithMetadata);
+        // Load the EXIF data from the original image to preserve it
+        const exifObj = piexif.load(appState.originalPhotoWithMetadata);
         
         // Create a canvas to rotate the image
         const canvas = document.createElement('canvas');
@@ -1022,6 +1045,7 @@ function newCapture() {
     // Reset rotation state
     appState.imageRotation = 0;
     appState.originalPhotoWithMetadata = null;
+    appState.photoWithMetadata = null;
     
     // Start camera automatically when returning to camera view
     if (!appState.isCameraActive) {
@@ -1058,6 +1082,9 @@ async function saveToGallery(imageUrl) {
     if (appState.imageRotation !== 0 && appState.originalPhotoWithMetadata) {
         // Apply rotation to the original image with metadata
         imageToSave = await applyRotationToImage(appState.originalPhotoWithMetadata, appState.imageRotation);
+    } else if (appState.originalPhotoWithMetadata) {
+        // If no rotation was applied, use the original photo with metadata
+        imageToSave = appState.originalPhotoWithMetadata;
     }
 
     // Try to save directly to gallery using the File System Access API if supported
@@ -1314,14 +1341,9 @@ async function addTimestampAndLogoToImage(imageUrl) {
 async function applyRotationToImage(imageUrl, rotationAngle) {
     return new Promise((resolve, reject) => {
         const img = new Image();
-        img.onload = async function() {
+        img.onload = function() {
             // Load the EXIF data from the original image
             const exifObj = piexif.load(imageUrl);
-            
-            // Get the timestamp from the EXIF data for use on the rotated image
-            const timestamp = exifObj['Exif'] && exifObj['Exif'][piexif.ExifIFD.DateTimeOriginal] 
-                ? exifObj['Exif'][piexif.ExifIFD.DateTimeOriginal] 
-                : new Date().toLocaleString();
             
             // Create a canvas to rotate the image
             const canvas = document.createElement('canvas');
