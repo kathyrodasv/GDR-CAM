@@ -1,0 +1,56 @@
+{
+  "name": "GDR-CAM - Aplicación de Captura de Fotos",
+  "short_name": "GDR-CAM",
+  "description": "Aplicación para tomar fotos con metadatos GPS y formularios de observación",
+  "start_url": "/index.html",
+  "display": "standalone",
+  "background_color": "#1A2230",
+  "theme_color": "#007bff",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "img/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "img/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "img/LOGO GDR.jpeg",
+      "sizes": "192x192",
+      "type": "image/jpeg",
+      "purpose": "any"
+    }
+  ],
+  "categories": [
+    "utilities",
+    "photography"
+  ],
+  "lang": "es",
+  "dir": "ltr",
+  "shortcuts": [
+    {
+      "name": "Tomar Foto",
+      "short_name": "Foto",
+      "description": "Iniciar cámara para tomar una foto",
+      "url": "/index.html",
+      "icons": [
+        {
+          "src": "img/icon-512x512.png",
+          "sizes": "96x96"
+        }
+      ]
+    }
+  ],
+  "protocol_handlers": [
+    {
+      "protocol": "web+gdr",
+      "url": "/index.html"
+    }
+  ]
+}

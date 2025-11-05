@@ -51,7 +51,7 @@ function init() {
     window.addEventListener('load', () => {
         // Verify service worker support and register
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/sw.js')
+            navigator.serviceWorker.register('./sw.js')
                 .then(registration => {
                     console.log('ServiceWorker registrado con éxito:', registration);
                 })
@@ -366,8 +366,8 @@ function getCurrentLocation() {
 }
 
 // Take photo
-function takePhoto() {
-    const processImage = (imageSource) => {
+async function takePhoto() {
+    const processImage = async (imageSource) => {
         try {
             const canvas = document.createElement('canvas');
             // Use actual video/source dimensions for maximum quality
@@ -382,7 +382,17 @@ function takePhoto() {
             context.drawImage(imageSource, 0, 0, width, height);
             
             // Capture with maximum quality (98%)
-            appState.capturedPhotoDataUrl = canvas.toDataURL('image/jpeg', 0.98);
+            let imageDataUrl = canvas.toDataURL('image/jpeg', 0.98);
+
+            // Correct the image orientation based on EXIF data before storing
+            try {
+                imageDataUrl = await correctImageOrientation(imageDataUrl);
+            } catch (orientationError) {
+                console.warn('Could not correct image orientation:', orientationError);
+                // If orientation correction fails, use the original image
+            }
+
+            appState.capturedPhotoDataUrl = imageDataUrl;
 
             elements.video.srcObject = null;
             if (appState.stream) {
@@ -412,8 +422,8 @@ function takePhoto() {
             .then(blob => {
                 const image = new Image();
                 image.src = URL.createObjectURL(blob);
-                image.onload = () => {
-                    processImage(image);
+                image.onload = async () => {
+                    await processImage(image);
                 };
                 image.onerror = (error) => {
                     console.error('Error loading captured photo:', error);
@@ -428,8 +438,8 @@ function takePhoto() {
                     .then(blob => {
                         const image = new Image();
                         image.src = URL.createObjectURL(blob);
-                        image.onload = () => {
-                            processImage(image);
+                        image.onload = async () => {
+                            await processImage(image);
                         };
                         image.onerror = (error) => {
                             console.error('Error loading captured photo with default settings:', error);
@@ -442,7 +452,7 @@ function takePhoto() {
                     });
             });
     } else {
-        processImage(elements.video);
+        await processImage(elements.video);
     }
 }
 
@@ -491,6 +501,97 @@ function getImageOrientation(imageDataUrl) {
         img.onerror = function() {
             resolve(1); // Default orientation if image fails to load
         };
+        img.src = imageDataUrl;
+    });
+}
+
+// Function to correct image orientation based on EXIF data
+function correctImageOrientation(imageDataUrl) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = function() {
+            EXIF.getData(img, function() {
+                const orientation = EXIF.getTag(this, "Orientation");
+                
+                if (!orientation || orientation === 1) {
+                    // No rotation needed, return original image
+                    resolve(imageDataUrl);
+                    return;
+                }
+                
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                
+                // Set canvas dimensions based on orientation
+                let { width, height } = img;
+                if (orientation >= 5 && orientation <= 8) {
+                    [width, height] = [height, width]; // Swap dimensions for rotated images
+                }
+                
+                canvas.width = width;
+                canvas.height = height;
+                
+                // Apply transformations based on EXIF orientation
+                ctx.save();
+                
+                switch (orientation) {
+                    case 2:
+                        // Flip horizontal
+                        ctx.translate(width, 0);
+                        ctx.scale(-1, 1);
+                        break;
+                    case 3:
+                        // Rotate 180
+                        ctx.translate(width, height);
+                        ctx.rotate(Math.PI);
+                        break;
+                    case 4:
+                        // Flip vertical
+                        ctx.translate(0, height);
+                        ctx.scale(1, -1);
+                        break;
+                    case 5:
+                        // Flip along top-left to bottom-right diagonal
+                        ctx.rotate(0.5 * Math.PI);
+                        ctx.scale(1, -1);
+                        break;
+                    case 6:
+                        // Rotate 90
+                        ctx.rotate(0.5 * Math.PI);
+                        ctx.translate(0, -height);
+                        break;
+                    case 7:
+                        // Flip along top-right to bottom-left diagonal
+                        ctx.rotate(0.5 * Math.PI);
+                        ctx.translate(width, -height);
+                        ctx.scale(-1, 1);
+                        break;
+                    case 8:
+                        // Rotate -90
+                        ctx.rotate(-0.5 * Math.PI);
+                        ctx.translate(-width, 0);
+                        break;
+                    default:
+                        // No rotation needed
+                        ctx.restore();
+                        resolve(imageDataUrl);
+                        return;
+                }
+                
+                // Draw the image on the canvas with correct orientation
+                ctx.drawImage(img, 0, 0, img.width, img.height);
+                ctx.restore();
+                
+                // Convert canvas back to data URL
+                const correctedImage = canvas.toDataURL('image/jpeg', 0.98);
+                resolve(correctedImage);
+            });
+        };
+        
+        img.onerror = function() {
+            reject(new Error('Error loading image for orientation correction'));
+        };
+        
         img.src = imageDataUrl;
     });
 }
@@ -743,6 +844,9 @@ async function addMetadataToImage(imageDataUrl, metadata) {
 
                 appState.photoWithMetadata = newImage;
                 elements.photoPreview.src = newImage;
+                
+                // If the preview image is not correctly oriented for display, we may need to correct it specifically for the preview
+                // The image should already be corrected by drawTimestampAndLogoOnImage, but let's ensure preview shows correctly
                 elements.formSection.classList.add('hidden');
                 elements.resultSection.classList.remove('hidden');
                 showStatus('¡Foto guardada con metadatos!', 'success');
