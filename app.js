@@ -21,7 +21,6 @@ const appState = {
 const elements = {
     video: null,
     canvas: null,
-    startCameraBtn: null,
     takePhotoBtn: null,
     zoomInBtn: null,
     zoomOutBtn: null,
@@ -1322,8 +1321,8 @@ function newCapture() {
 function autoStartCamera() {
     // Only start camera if no active stream
     if (!appState.stream) {
-        // Simulate click on start camera button
-        elements.startCameraBtn.click();
+        // Call startCamera function directly since we removed the start button
+        startCamera();
     }
 }
 
