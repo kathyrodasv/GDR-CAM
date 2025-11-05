@@ -7,9 +7,9 @@ const urlsToCache = [
   '/style.css',
   '/piexif.js',
   '/exif.js',
-  '/save-image.js',
-  '/app.js',  // Added the new app.js file
-  '/img/LOGO GDR.jpeg'
+  '/app.js',
+  '/img/LOGO GDR.jpeg',
+  '/img/icon-512x512.png'
 ];
 
 // Instalación del Service Worker
