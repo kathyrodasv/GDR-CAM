@@ -742,52 +742,9 @@ function drawTimestampAndLogoOnImage(imageDataUrl, timestamp) {
                 canvasHeight = img.height;
             }
 
-            // Draw the logo and timestamp with positions that respect the canvas orientation
-            const logo = new Image();
-            logo.onload = function() {
-                const logoHeight = Math.min(320, canvasHeight * 0.15); // Make logo proportional to image
-                const logoAspectRatio = logo.width / logo.height;
-                const logoWidth = logoHeight * logoAspectRatio;
-                const logoPadding = Math.min(25, canvasWidth * 0.02, canvasHeight * 0.02); // Make padding proportional to image
-
-                // Calculate positions accounting for the actual canvas dimensions
-                const logoX = logoPadding;
-                const logoY = canvasHeight - logoHeight - logoPadding;
-                
-                // Draw logo on the original canvas context (after restoring transformations)
-                // This ensures the logo appears in the correct orientation, independent of image rotation
-                ctx.drawImage(logo, logoX, logoY, logoWidth, logoHeight);
-
-                // Prepare to draw timestamp text
-                const fontSize = Math.min(80, Math.max(20, Math.floor(canvasHeight * 0.04))); // Scale font with image size
-                ctx.font = `${fontSize}px Arial`;
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-                ctx.textAlign = 'right';
-                ctx.textBaseline = 'bottom';
-
-                const timestampX = canvasWidth - logoPadding;
-                const timestampY = canvasHeight - logoPadding;
-                ctx.fillText(timestamp, timestampX, timestampY);
-
-                resolve(canvas.toDataURL('image/jpeg', 0.98));
-            };
-            
-            logo.onerror = function() {
-                // If the logo fails to load, still draw the timestamp
-                const fontSize = Math.min(80, Math.max(20, Math.floor(canvasHeight * 0.04))); // Scale font with image size
-                ctx.font = `${fontSize}px Arial`;
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-                ctx.textAlign = 'right';
-                ctx.textBaseline = 'bottom';
-
-                const timestampX = canvasWidth - 15;
-                const timestampY = canvasHeight - 15;
-                ctx.fillText(timestamp, timestampX, timestampY);
-
-                resolve(canvas.toDataURL('image/jpeg', 0.98));
-            };
-            
-            logo.src = 'img/LOGO GDR.jpeg';
+            // For the preview, we don't add the timestamp and logo immediately
+            // Instead, we'll add them later after the user confirms the orientation
+            resolve(canvas.toDataURL('image/jpeg', 0.98));
         };
         
         img.onerror = function() {
@@ -975,7 +932,7 @@ async function addMetadataToImage(imageDataUrl, metadata) {
     }
 }
 
-// Function to rotate an image by a given angle
+// Function to rotate an image by a given angle (without adding timestamp/logo to preview)
 async function rotateImage(angle) {
     if (!appState.photoWithMetadata) {
         showStatus('No hay imagen para rotar', 'error');
@@ -986,11 +943,6 @@ async function rotateImage(angle) {
     img.onload = async function() {
         // Load the EXIF data from the current image to preserve it
         const exifObj = piexif.load(appState.photoWithMetadata);
-        
-        // Get the timestamp from the EXIF data for use on the rotated image
-        const timestamp = exifObj['Exif'] && exifObj['Exif'][piexif.ExifIFD.DateTimeOriginal] 
-            ? exifObj['Exif'][piexif.ExifIFD.DateTimeOriginal] 
-            : new Date().toLocaleString();
         
         // Create a canvas to rotate the image
         const canvas = document.createElement('canvas');
@@ -1017,84 +969,25 @@ async function rotateImage(angle) {
         // Draw the image centered on the rotated canvas
         ctx.drawImage(img, -img.width / 2, -img.height / 2);
         
-        // Restore the initial state to draw text and logo in horizontal orientation
+        // Restore the context to avoid adding labels in preview
         ctx.restore();
         
-        // Draw the logo and timestamp horizontally on the rotated image for preview
-        const logo = new Image();
-        logo.onload = function() {
-            const logoHeight = Math.min(320, canvas.height * 0.15); // Make logo proportional to image
-            const logoAspectRatio = logo.width / logo.height;
-            const logoWidth = logoHeight * logoAspectRatio;
-            const logoPadding = Math.min(25, canvas.width * 0.02, canvas.height * 0.02); // Make padding proportional to image
-
-            // Calculate positions for the logo in the bottom-left corner of the canvas
-            const logoX = logoPadding;
-            const logoY = canvas.height - logoHeight - logoPadding;
-            
-            // Draw logo with proper positioning
-            ctx.drawImage(logo, logoX, logoY, logoWidth, logoHeight);
-
-            // Prepare to draw timestamp text in the bottom-right corner
-            const fontSize = Math.min(80, Math.max(20, Math.floor(canvas.height * 0.04))); // Scale font with image size
-            ctx.font = `${fontSize}px Arial`;
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-            ctx.textAlign = 'right';
-            ctx.textBaseline = 'bottom';
-
-            const timestampX = canvas.width - logoPadding;
-            const timestampY = canvas.height - logoPadding;
-            ctx.fillText(timestamp, timestampX, timestampY);
-
-            // Convert canvas back to data URL
-            const rotatedImageWithText = canvas.toDataURL('image/jpeg', 0.98);
-            
-            // Reinsert the original EXIF data into the rotated image with text
-            const exifBytes = piexif.dump(exifObj);
-            const imageWithExif = piexif.insert(exifBytes, rotatedImageWithText);
-            
-            // Update the preview and app state
-            elements.photoPreview.src = imageWithExif;
-            appState.photoWithMetadata = imageWithExif;
-            
-            // Update the rotation angle in app state (keeping within 0-359 range)
-            appState.imageRotation = (appState.imageRotation + angle) % 360;
-            if (appState.imageRotation < 0) {
-                appState.imageRotation += 360;
-            }
-        };
+        // Convert canvas back to data URL without adding timestamp/logo
+        const rotatedImage = canvas.toDataURL('image/jpeg', 0.98);
         
-        logo.onerror = function() {
-            // If the logo fails to load, still draw the timestamp
-            const fontSize = Math.min(80, Math.max(20, Math.floor(canvas.height * 0.04))); // Scale font with image size
-            ctx.font = `${fontSize}px Arial`;
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-            ctx.textAlign = 'right';
-            ctx.textBaseline = 'bottom';
-
-            const timestampX = canvas.width - 15;
-            const timestampY = canvas.height - 15;
-            ctx.fillText(timestamp, timestampX, timestampY);
-
-            // Convert canvas back to data URL
-            const rotatedImageWithText = canvas.toDataURL('image/jpeg', 0.98);
-            
-            // Reinsert the original EXIF data into the rotated image with text
-            const exifBytes = piexif.dump(exifObj);
-            const imageWithExif = piexif.insert(exifBytes, rotatedImageWithText);
-            
-            // Update the preview and app state
-            elements.photoPreview.src = imageWithExif;
-            appState.photoWithMetadata = imageWithExif;
-            
-            // Update the rotation angle in app state (keeping within 0-359 range)
-            appState.imageRotation = (appState.imageRotation + angle) % 360;
-            if (appState.imageRotation < 0) {
-                appState.imageRotation += 360;
-            }
-        };
+        // Reinsert the original EXIF data into the rotated image
+        const exifBytes = piexif.dump(exifObj);
+        const imageWithExif = piexif.insert(exifBytes, rotatedImage);
         
-        logo.src = 'img/LOGO GDR.jpeg';
+        // Update the preview and app state
+        elements.photoPreview.src = imageWithExif;
+        appState.photoWithMetadata = imageWithExif;
+        
+        // Update the rotation angle in app state (keeping within 0-359 range)
+        appState.imageRotation = (appState.imageRotation + angle) % 360;
+        if (appState.imageRotation < 0) {
+            appState.imageRotation += 360;
+        }
     };
     
     img.onerror = function() {
@@ -1165,6 +1058,9 @@ async function saveToGallery(imageUrl) {
     if (appState.imageRotation !== 0 && appState.originalPhotoWithMetadata) {
         // Apply rotation to the original image with metadata
         imageToSave = await applyRotationToImage(appState.originalPhotoWithMetadata, appState.imageRotation);
+    } else {
+        // If no rotation is applied, apply the timestamp and logo before saving
+        imageToSave = await addTimestampAndLogoToImage(imageToSave);
     }
 
     try {
@@ -1232,7 +1128,99 @@ async function saveToGallery(imageUrl) {
 
 }
 
-// Apply rotation to an image while preserving its metadata
+// Function to add timestamp and logo to an image before saving to gallery
+async function addTimestampAndLogoToImage(imageUrl) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = function() {
+            // Load the EXIF data from the original image
+            const exifObj = piexif.load(imageUrl);
+            
+            // Get the timestamp from the EXIF data for use on the image
+            const timestamp = exifObj['Exif'] && exifObj['Exif'][piexif.ExifIFD.DateTimeOriginal] 
+                ? exifObj['Exif'][piexif.ExifIFD.DateTimeOriginal] 
+                : new Date().toLocaleString();
+            
+            // Create a canvas to add timestamp and logo to the image
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = img.width;
+            canvas.height = img.height;
+            
+            // Draw the image on the canvas
+            ctx.drawImage(img, 0, 0);
+            
+            // Add the logo and timestamp to the image when saving 
+            const logo = new Image();
+            logo.onload = function() {
+                const logoHeight = Math.min(320, canvas.height * 0.15); // Make logo proportional to image
+                const logoAspectRatio = logo.width / logo.height;
+                const logoWidth = logoHeight * logoAspectRatio;
+                const logoPadding = Math.min(25, canvas.width * 0.02, canvas.height * 0.02); // Make padding proportional to image
+
+                // Calculate positions for the logo in the bottom-left corner of the canvas
+                const logoX = logoPadding;
+                const logoY = canvas.height - logoHeight - logoPadding;
+                
+                // Draw logo with proper positioning
+                ctx.drawImage(logo, logoX, logoY, logoWidth, logoHeight);
+
+                // Prepare to draw timestamp text in the bottom-right corner
+                const fontSize = Math.min(80, Math.max(20, Math.floor(canvas.height * 0.04))); // Scale font with image size
+                ctx.font = `${fontSize}px Arial`;
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                ctx.textAlign = 'right';
+                ctx.textBaseline = 'bottom';
+
+                const timestampX = canvas.width - logoPadding;
+                const timestampY = canvas.height - logoPadding;
+                ctx.fillText(timestamp, timestampX, timestampY);
+
+                // Convert canvas back to data URL
+                const imageWithText = canvas.toDataURL('image/jpeg', 0.98);
+                
+                // Reinsert the original EXIF data into the image with text
+                const exifBytes = piexif.dump(exifObj);
+                const imageWithExif = piexif.insert(exifBytes, imageWithText);
+                
+                resolve(imageWithExif);
+            };
+            
+            logo.onerror = function() {
+                // If the logo fails to load, still draw the timestamp
+                const fontSize = Math.min(80, Math.max(20, Math.floor(canvas.height * 0.04))); // Scale font with image size
+                ctx.font = `${fontSize}px Arial`;
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                ctx.textAlign = 'right';
+                ctx.textBaseline = 'bottom';
+
+                const timestampX = canvas.width - 15;
+                const timestampY = canvas.height - 15;
+                ctx.fillText(timestamp, timestampX, timestampY);
+
+                // Convert canvas back to data URL
+                const imageWithText = canvas.toDataURL('image/jpeg', 0.98);
+                
+                // Reinsert the original EXIF data into the image with text
+                const exifBytes = piexif.dump(exifObj);
+                const imageWithExif = piexif.insert(exifBytes, imageWithText);
+                
+                resolve(imageWithExif);
+            };
+            
+            logo.src = 'img/LOGO GDR.jpeg';
+        };
+        
+        img.onerror = function() {
+            reject(new Error('Error loading image'));
+        };
+        
+        img.src = imageUrl;
+    });
+}
+
+// Apply rotation to an image while preserving its metadata and adding timestamp/logo only when saving
 async function applyRotationToImage(imageUrl, rotationAngle) {
     return new Promise((resolve, reject) => {
         const img = new Image();
@@ -1273,7 +1261,7 @@ async function applyRotationToImage(imageUrl, rotationAngle) {
             // Restore the initial context state to draw text and logo in horizontal orientation
             ctx.restore();
             
-            // Draw the logo and timestamp horizontally on the rotated image
+            // Draw the logo and timestamp horizontally on the rotated image when saving
             const logo = new Image();
             logo.onload = function() {
                 const logoHeight = Math.min(320, canvas.height * 0.15); // Make logo proportional to image
