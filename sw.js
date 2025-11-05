@@ -1,15 +1,16 @@
-const CACHE_NAME = 'gdr-cam-v25';
+const CACHE_NAME = 'gdr-cam-v26';
 const urlsToCache = [
-  './',
-  './index.html',
-  './app.js',
-  './style.css',
-  './exif.js',
-  './piexif.js',
-  './img/LOGO GDR.jpeg',
-  './img/icon-512x512.png',
-  './img/ECUACORRIENTE.png',
-  './manifest.json'
+  'index.html',
+  'app.js',
+  'style.css',
+  'exif.js',
+  'piexif.js',
+  'img/LOGO GDR.jpeg',
+  'img/icon-512x512.png',
+  'img/ECUACORRIENTE.png',
+  'manifest.json',
+  'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css',
+  'https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap'
 ];
 
 // Install a service worker

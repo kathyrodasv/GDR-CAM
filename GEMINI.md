@@ -1,48 +1,42 @@
-# GEMINI Code Assistant Report
+# GEMINI.md - GDR-CAM Project
 
 ## Project Overview
 
-This project is a Progressive Web App (PWA) named "GDR-CAM". Its primary function is to serve as a photo-capturing application that embeds metadata into the images. The application is designed to work seamlessly on various devices, including mobile phones and PCs, and it supports offline functionality.
+GDR-CAM is a Progressive Web App (PWA) designed for capturing photos and embedding them with rich metadata. The application allows users to take a picture, fill out an observation form, and automatically add GPS coordinates and a timestamp. The final image, complete with a logo and all collected data stored in its EXIF metadata, can be saved directly to the user's device.
 
-### Key Features:
+The project is built entirely with client-side web technologies: HTML5, CSS3, and JavaScript. It functions as a static website and can be run without a backend server. Its PWA capabilities, enabled by a Service Worker and a Web App Manifest, allow it to be installed on mobile devices and desktops for offline use.
 
-- **Photo Capture:** Utilizes the device's camera to take pictures.
-- **Metadata Form:** Users can fill out a form with details such as "Frente de trabajo," "Coronamiento," "Tipo de observación," and "Actividad realizada."
-- **EXIF Metadata:** The information from the form, along with GPS coordinates (latitude, longitude, altitude), is embedded into the photo's EXIF data.
-- **View Metadata:** A modal window displays the captured EXIF data, allowing the user to verify the information.
-- **Offline Functionality:** The application can be used without an internet connection, thanks to a Service Worker.
-- **PWA:** It can be "installed" on a device's home screen for easy access.
-- **Image Saving:** Provides functionality to save the captured image to the device's gallery.
+Key libraries used are `exif.js` for reading and `piexif.js` for writing EXIF metadata to the JPEG images.
 
-### Technologies Used:
+## Running the Project
 
-- **Frontend:** HTML5, CSS3, JavaScript
-- **Camera Access:** `getUserMedia` API, `ImageCapture` API
-- **Metadata:** `piexif.js` and `exif.js` libraries for reading and writing EXIF metadata.
-- **Offline Support:** Service Workers (`sw.js`)
-- **PWA:** Web App Manifest (`manifest.json`)
+This is a static web project. There is no build process required.
 
-## Building and Running
+To run the application, you need to serve the project files using a local web server.
 
-This is a static web project with no build process.
-
-### Running the Application:
-
-1.  **Serve the files:** You need to serve the project files using a local web server. You can use any simple web server. For example, if you have Python installed, you can run the following command in the project's root directory:
+1.  **Start a local web server:**
+    If you have Python installed, you can run one of the following commands in the project's root directory:
     ```bash
+    # For Python 3
     python -m http.server
     ```
-2.  **Access the application:** Open your web browser and navigate to the local server's address (e.g., `http://localhost:8000`).
+    ```bash
+    # For Python 2
+    python -m SimpleHTTPServer
+    ```
+    Alternatively, you can use other tools like `npx serve`.
 
-The application should load, and you can start using it.
+2.  **Access the application:**
+    Open your web browser and navigate to the URL provided by the local server (e.g., `http://localhost:8000`).
+
+**Note:** The application requires a secure context (`https://` or `localhost`) to access camera and geolocation features.
 
 ## Development Conventions
 
-- **Single-Page Application:** The entire user interface and logic are contained within `index.html`.
-- **JavaScript Libraries:** The project relies on `exif.js`, `piexif.js`, and `save-image.js`, which are included via `<script>` tags in `index.html`.
-- **Image Capture:** The application uses the `ImageCapture` API to take photos, which helps in preserving the original EXIF metadata from the camera. A fallback to the canvas method is implemented for browsers that do not support `ImageCapture`.
-- **GPS Capture Flow:** To ensure that GPS data is captured, the user is notified that the location is being obtained, and the photo capture is delayed until the location is acquired.
-- **Metadata Display:** A modal window is used to display the EXIF data of the captured photo, providing immediate feedback to the user.
-- **Offline First:** The Service Worker (`sw.js`) is configured to cache the main application files (`/`, `index.html`, `manifest.json`), allowing the app to load and function offline.
-- **PWA Configuration:** The `manifest.json` file defines the application's name, icons, and other properties for the PWA experience.
-- **Responsive Design:** The `style.css` file includes media queries to adapt the layout for different screen sizes, particularly for mobile devices.
+*   **Code Style:** The JavaScript code is written in a procedural style with a global `appState` object managing the application's state. DOM elements are cached in an `elements` object.
+*   **Libraries:** All JavaScript libraries (`exif.js`, `piexif.js`) are included directly via `<script>` tags in `index.html`. There is no package manager like npm or yarn in use.
+*   **Metadata Handling:**
+    *   Form data is converted to a JSON string and stored in the `UserComment` EXIF tag.
+    *   GPS data (latitude, longitude, altitude) is stored in the standard GPS EXIF tags.
+    *   A timestamp and a logo (`img/LOGO GDR.jpeg`) are drawn directly onto the image canvas before saving.
+*   **Testing:** The project includes a `read_metadata.py` script, which suggests that developers can use it to verify the EXIF data of the generated images locally. To use it, you need to have Python and the `piexif` library installed (`pip install piexif`).
