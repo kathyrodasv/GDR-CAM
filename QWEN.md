@@ -13,6 +13,8 @@ GDR-CAM is a Progressive Web App (PWA) for capturing photos with embedded metada
 - **Image Processing:** Adds timestamps and logos to captured images
 - **Metadata Verification:** Modal display to view embedded metadata
 - **Gallery Integration:** Automatic saving to device gallery with sharing API fallback
+- **Proper Image Orientation:** Corrects image orientation based on device rotation and EXIF data
+- **Installable PWA:** Full PWA functionality with proper manifest and service worker
 
 ### Technologies Used:
 
@@ -112,11 +114,44 @@ The project includes Python scripts for EXIF metadata verification:
 - `simple_exif_check.py`: Basic EXIF validation
 - `verify_metadata.py`: Interactive EXIF data verification
 
+## PWA Files
+
+The application now includes two essential files for PWA functionality:
+
+### sw.js (Service Worker)
+- Caches essential application files for offline functionality
+- Handles network requests with cache-first strategy
+- Properly updates cache versions
+- Includes fallback for navigation requests
+
+### manifest.json (Web App Manifest)
+- Defines app name, icons, and display properties
+- Configures standalone display mode
+- Includes proper icon sizes and types
+- Sets theme colors and orientation
+
+## Orientation Correction Implementation
+
+The application now properly handles device rotation and image orientation:
+
+### Functions Added:
+- `correctImageOrientation()`: Reads EXIF orientation data and applies appropriate transformations
+- Modified `takePhoto()` to be asynchronous and apply orientation correction
+- Preserved existing `drawTimestampAndLogoOnImage()` orientation handling
+
+### How It Works:
+1. Captures image using device camera
+2. Reads EXIF orientation data immediately after capture
+3. Applies rotation/flip transformations based on EXIF data
+4. Stores properly oriented image for further processing
+5. Maintains correct orientation through all subsequent operations
+
 ## Common Issues and Solutions
 
 1. **Camera Permissions:** Ensure proper permissions are granted in browser settings
 2. **GPS Accuracy:** High accuracy GPS may take time to acquire in new locations
 3. **EXIF Compatibility:** Some image editing tools may strip EXIF data
 4. **iOS Gallery:** Special handling for saving to iOS gallery is implemented
+5. **PWA Installation:** Proper service worker and manifest files are now included for reliable installation
 
 This project is designed for field observation work where metadata integrity and location accuracy are critical.

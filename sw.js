@@ -1,14 +1,15 @@
-const CACHE_NAME = 'gdr-cam-v24';
+const CACHE_NAME = 'gdr-cam-v25';
 const urlsToCache = [
-  '/',
-  '/index.html',
-  '/app.js',
-  '/style.css',
-  '/exif.js',
-  '/piexif.js',
-  '/img/LOGO GDR.jpeg',
-  '/img/icon-512x512.png',
-  '/img/ECUACORRIENTE.png'
+  './',
+  './index.html',
+  './app.js',
+  './style.css',
+  './exif.js',
+  './piexif.js',
+  './img/LOGO GDR.jpeg',
+  './img/icon-512x512.png',
+  './img/ECUACORRIENTE.png',
+  './manifest.json'
 ];
 
 // Install a service worker
@@ -19,6 +20,10 @@ self.addEventListener('install', (event) => {
       .then((cache) => {
         console.log('Opened cache');
         return cache.addAll(urlsToCache);
+      })
+      .catch(error => {
+        console.error('Failed to open cache during install:', error);
+        throw error;
       })
   );
 });
@@ -32,8 +37,15 @@ self.addEventListener('fetch', (event) => {
         if (response) {
           return response;
         }
-        return fetch(event.request);
-      }
+        // If not in cache, try to fetch from network
+        return fetch(event.request).catch(error => {
+          console.error('Network request failed:', event.request.url, error);
+          // Return the root page for navigation requests to ensure PWA works offline
+          if (event.request.mode === 'navigate') {
+            return caches.match('./index.html');
+          }
+        });
+      })
     )
   );
 });
@@ -46,10 +58,14 @@ self.addEventListener('activate', (event) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
           if (cacheWhitelist.indexOf(cacheName) === -1) {
+            console.log('Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
       );
+    })
+    .then(() => {
+      console.log('Service worker activated and old caches cleaned');
     })
   );
 });
