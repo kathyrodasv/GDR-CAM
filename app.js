@@ -158,7 +158,7 @@ function attachEventListeners() {
     });
     
     elements.newCaptureBtn.addEventListener('click', newCapture);
-    elements.downloadPhotoBtn.addEventListener('click', () => {
+    elements.downloadPhotoBtn.addEventListener('click', async () => {
         if (!appState.photoWithMetadata) {
             showStatus('No hay imagen para guardar', 'error');
             return;
@@ -168,8 +168,11 @@ function attachEventListeners() {
         elements.downloadPhotoBtn.innerHTML = '<span class="loading"></span> Guardando...';
         elements.downloadPhotoBtn.disabled = true;
         
+        // Apply timestamp and logo before saving to gallery
+        const imageToSave = await addTimestampAndLogoToImage(appState.photoWithMetadata);
+        
         // Call the consolidated saveToGallery function
-        saveToGallery(appState.photoWithMetadata);
+        saveToGallery(imageToSave);
     });
     
     // Rotation controls
@@ -883,7 +886,7 @@ async function addMetadataToImage(imageDataUrl, metadata) {
                 // The image should already be corrected by drawTimestampAndLogoOnImage, but let's ensure preview shows correctly
                 elements.formSection.classList.add('hidden');
                 elements.resultSection.classList.remove('hidden');
-                showStatus('¡Foto guardada con metadatos!', 'success');
+                showStatus('¡Foto guardada con metadatos! Confirme la orientación y guarde en galería.', 'success');
                 
                 // Reset both buttons if they exist
                 if (elements.saveMetadataBtn) {
@@ -894,9 +897,6 @@ async function addMetadataToImage(imageDataUrl, metadata) {
                     elements.saveWithoutFormBtn.innerHTML = 'Guardar Foto sin Formulario';
                     elements.saveWithoutFormBtn.disabled = false;
                 }
-                
-                // Automatically save to gallery
-                saveToGallery(newImage);
 
             } catch (err) {
                 console.error('Error in addMetadataToImage:', err);
@@ -1058,74 +1058,37 @@ async function saveToGallery(imageUrl) {
     if (appState.imageRotation !== 0 && appState.originalPhotoWithMetadata) {
         // Apply rotation to the original image with metadata
         imageToSave = await applyRotationToImage(appState.originalPhotoWithMetadata, appState.imageRotation);
-    } else {
-        // If no rotation is applied, apply the timestamp and logo before saving
-        imageToSave = await addTimestampAndLogoToImage(imageToSave);
     }
 
-    try {
-        const response = await fetch(imageToSave);
-
-        const blob = await response.blob();
-
-        const filename = `gdr-cam-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.jpg`;
-
-        const file = new File([blob], filename, { type: blob.type });
-
-
-
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
-
-            await navigator.share({
-
-                files: [file],
-
-                title: 'Guardar imagen',
-
-                text: 'Guardar la foto capturada en la galería.',
-
+    // Try to save directly to gallery using the File System Access API if supported
+    if ('showSaveFilePicker' in window) {
+        try {
+            const fileHandle = await showSaveFilePicker({
+                suggestedName: `gdr-cam-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.jpg`,
+                types: [{
+                    description: 'JPEG Images',
+                    accept: { 'image/jpeg': ['.jpg', '.jpeg'] }
+                }]
             });
-
-            showStatus('La imagen se ha compartido con éxito.', 'success');
-
-        } else {
-
-            saveUsingDownloadAPI(imageToSave);
-
-        }
-
-    } catch (error) {
-
-        if (error.name !== 'AbortError') {
-
-            console.error('Error al compartir la imagen:', error);
-
-            showStatus('Error al guardar la imagen. Intentando método alternativo.', 'error');
-
-            saveUsingDownloadAPI(imageToSave);
-
-        } else {
-
-            showStatus('Guardado cancelado por el usuario.', 'success');
-
-        }
-
-    } finally {
-
-        // Always reset the button state, as both paths either complete or call another function
-
-        // that will handle the button state.
-
-        if (elements.downloadPhotoBtn.innerHTML.includes('Guardando...')) {
-
+            
+            const writable = await fileHandle.createWritable();
+            const response = await fetch(imageToSave);
+            const blob = await response.blob();
+            await writable.write(blob);
+            await writable.close();
+            
+            showStatus('Imagen guardada en la galería', 'success');
             elements.downloadPhotoBtn.innerHTML = 'Guardar en Galería';
-
             elements.downloadPhotoBtn.disabled = false;
-
+            return;
+        } catch (error) {
+            console.warn('File System Access API failed, falling back to download method:', error);
+            // Fall through to the download method below
         }
-
     }
-
+    
+    // Fallback to download method
+    saveUsingDownloadAPI(imageToSave);
 }
 
 // Function to add timestamp and logo to an image before saving to gallery
@@ -1332,48 +1295,62 @@ async function applyRotationToImage(imageUrl, rotationAngle) {
 
 
 
-// Alternative method using the download API
+// Alternative method using the download API with Android optimization
 
-function saveUsingDownloadAPI(imageUrl) {
+async function saveUsingDownloadAPI(imageUrl) {
 
     try {
-
-        const link = document.createElement('a');
-
-        link.href = imageUrl;
-
-        link.download = `gdr-cam-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.jpg`;
-
-        document.body.appendChild(link);
-
-        link.click();
-
-        document.body.removeChild(link);
-
+        // For Android, try using the download approach with proper MIME type
+        const response = await fetch(imageUrl);
+        const blob = await response.blob();
         
-
-        showStatus('Imagen descargada a la carpeta de descargas.', 'success');
-
-    } catch (error) {
-
-        console.error('Error al guardar imagen con el método de descarga:', error);
-
-        showStatus('Error al guardar la imagen.', 'error');
-
-    } finally {
-
-        // Ensure the button is reset even if the download fails
-
-        if (elements.downloadPhotoBtn.innerHTML.includes('Guardando...')) {
-
-            elements.downloadPhotoBtn.innerHTML = 'Guardar en Galería';
-
-            elements.downloadPhotoBtn.disabled = false;
-
+        // Check if we're on a mobile device (Android/iOS)
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        
+        if (isMobile && navigator.userAgent.indexOf('Android') !== -1) {
+            // On Android devices, try to save using the download approach
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `gdr-cam-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.jpg`;
+            
+            // Trigger the download
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            // Clean up the URL object
+            URL.revokeObjectURL(url);
+            
+            // On Android, this saves to Downloads folder which is usually synced with gallery
+            showStatus('Imagen guardada en Descargas. Puede aparecer en la Galería en unos segundos.', 'success');
+        } else {
+            // For non-Android devices, use the standard approach
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `gdr-cam-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.jpg`;
+            
+            // Trigger the download
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            // Clean up the URL object
+            URL.revokeObjectURL(url);
+            
+            showStatus('Imagen guardada en la galería', 'success');
         }
-
+    } catch (error) {
+        console.error('Error al guardar imagen con el método de descarga:', error);
+        showStatus('Error al guardar la imagen.', 'error');
+    } finally {
+        // Ensure the button is reset even if the download fails
+        if (elements.downloadPhotoBtn.innerHTML.includes('Guardando...')) {
+            elements.downloadPhotoBtn.innerHTML = 'Guardar en Galería';
+            elements.downloadPhotoBtn.disabled = false;
+        }
     }
-
 }
 
 
