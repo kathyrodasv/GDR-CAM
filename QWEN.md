@@ -1,4 +1,4 @@
-# QWEN.md - GDR-CAM Project Context
+# GDR-CAM Project Context
 
 ## Project Overview
 
@@ -79,9 +79,17 @@ GDR-CAM/
 ├── piexif.js           # EXIF writing library
 ├── save-image.js       # Gallery saving functionality
 ├── test.html           # Functionality testing page
+├── read_metadata.py    # Python script to read EXIF metadata
+├── simple_exif_check.py # Simple EXIF verification script
+├── verify_metadata.py  # Python script to verify metadata
+├── IMG_4343.JPG        # Sample image file
 ├── QWEN.md             # Current context file
+├── GEMINI.md           # Alternate context file
 ├── README.md           # Project documentation
-└── .gitattributes      # Git attributes configuration
+├── .gitattributes      # Git attributes configuration
+└── img/
+    ├── ECUACORRIENTE.png
+    └── LOGO GDR.jpeg
 ```
 
 ## Key Code Patterns

@@ -1,5 +1,5 @@
 // GDR-CAM Service Worker
-const CACHE_NAME = 'gdr-cam-v15';
+const CACHE_NAME = 'gdr-cam-v17';  // Updated cache version
 const urlsToCache = [
   '/',
   '/index.html',
@@ -8,6 +8,7 @@ const urlsToCache = [
   '/piexif.js',
   '/exif.js',
   '/save-image.js',
+  '/app.js',  // Added the new app.js file
   '/img/LOGO GDR.jpeg'
 ];
 
