@@ -146,7 +146,7 @@ When saving photos to the gallery, the application adds the following graphical 
 3. **Timestamp** - Placed in the bottom-right corner of the image
    - Format: Capture date and time (e.g., "2023:08:15 14:30:25")
    - Font size scales with image size (between 20px and 80px)
-   - Color: White with slight transparency (rgba(255, 255, 255, 0.9))
+   - Appearance: White text with black outline for high visibility on any background
 
 ### Important:
 - These graphical elements (logo, north indicator, and timestamp) are only added when saving the photo to the gallery, not in the preview within the app

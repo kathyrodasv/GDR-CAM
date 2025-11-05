@@ -1188,13 +1188,18 @@ async function addTimestampAndLogoToImage(imageUrl) {
                 ctx.strokeText(gpsInfo, centerX, northY);
                 ctx.fillText(gpsInfo, centerX, northY);
                 
-                // Prepare to draw timestamp text in the bottom-right corner
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                // Prepare to draw timestamp text in the bottom-right corner with white text and black outline
                 ctx.textAlign = 'right';
                 ctx.textBaseline = 'bottom';
 
                 const timestampX = canvas.width - padding;
                 const timestampY = canvas.height - padding;
+                
+                // Draw timestamp with white color and black outline
+                ctx.strokeStyle = 'black'; // Black outline
+                ctx.lineWidth = 2; // Outline thickness
+                ctx.fillStyle = 'white'; // White fill color
+                ctx.strokeText(timestamp, timestampX, timestampY);
                 ctx.fillText(timestamp, timestampX, timestampY);
 
                 // Convert canvas back to data URL
@@ -1270,13 +1275,18 @@ async function addTimestampAndLogoToImage(imageUrl) {
                 ctx.strokeText(gpsInfo, centerX, northY);
                 ctx.fillText(gpsInfo, centerX, northY);
 
-                // Prepare to draw timestamp text in the bottom-right corner
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                // Prepare to draw timestamp text in the bottom-right corner with white text and black outline
                 ctx.textAlign = 'right';
                 ctx.textBaseline = 'bottom';
 
                 const timestampX = canvas.width - padding;
                 const timestampY = canvas.height - padding;
+                
+                // Draw timestamp with white color and black outline
+                ctx.strokeStyle = 'black'; // Black outline
+                ctx.lineWidth = 2; // Outline thickness
+                ctx.fillStyle = 'white'; // White fill color
+                ctx.strokeText(timestamp, timestampX, timestampY);
                 ctx.fillText(timestamp, timestampX, timestampY);
 
                 // Convert canvas back to data URL
@@ -1415,13 +1425,18 @@ async function applyRotationToImage(imageUrl, rotationAngle) {
                 ctx.strokeText(gpsInfo, centerX, northY);
                 ctx.fillText(gpsInfo, centerX, northY);
 
-                // Prepare to draw timestamp text in the bottom-right corner
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                // Prepare to draw timestamp text in the bottom-right corner with white text and black outline
                 ctx.textAlign = 'right';
                 ctx.textBaseline = 'bottom';
 
                 const timestampX = canvas.width - padding;
                 const timestampY = canvas.height - padding;
+                
+                // Draw timestamp with white color and black outline
+                ctx.strokeStyle = 'black'; // Black outline
+                ctx.lineWidth = 2; // Outline thickness
+                ctx.fillStyle = 'white'; // White fill color
+                ctx.strokeText(timestamp, timestampX, timestampY);
                 ctx.fillText(timestamp, timestampX, timestampY);
 
                 // Convert canvas back to data URL
@@ -1497,13 +1512,18 @@ async function applyRotationToImage(imageUrl, rotationAngle) {
                 ctx.strokeText(gpsInfo, centerX, northY);
                 ctx.fillText(gpsInfo, centerX, northY);
 
-                // Prepare to draw timestamp text in the bottom-right corner
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                // Prepare to draw timestamp text in the bottom-right corner with white text and black outline
                 ctx.textAlign = 'right';
                 ctx.textBaseline = 'bottom';
 
                 const timestampX = canvas.width - padding;
                 const timestampY = canvas.height - padding;
+                
+                // Draw timestamp with white color and black outline
+                ctx.strokeStyle = 'black'; // Black outline
+                ctx.lineWidth = 2; // Outline thickness
+                ctx.fillStyle = 'white'; // White fill color
+                ctx.strokeText(timestamp, timestampX, timestampY);
                 ctx.fillText(timestamp, timestampX, timestampY);
 
                 // Convert canvas back to data URL
