@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prueba de Orientación - GDR-CAM</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        
+        .test-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            text-align: center;
+        }
+        
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        
+        button:hover {
+            background-color: #0056b3;
+        }
+        
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        
+        .orientation-display {
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        
+        .instructions {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>Prueba de Orientación - GDR-CAM</h1>
+        
+        <div class="instructions">
+            <p><strong>Instrucciones:</strong> Esta página permite probar la funcionalidad de bloqueo de orientación y rotación de imágenes implementadas en GDR-CAM.</p>
+        </div>
+        
+        <div class="test-section">
+            <h2>Estado de Orientación</h2>
+            <div class="orientation-display" id="orientation-display">Orientación actual: --</div>
+            <div class="status info" id="orientation-status">Detectando orientación...</div>
+        </div>
+        
+        <div class="test-section">
+            <h2>Prueba de Bloqueo de Orientación</h2>
+            <button id="lock-portrait">Bloquear a Vertical</button>
+            <button id="lock-landscape">Bloquear a Horizontal</button>
+            <button id="unlock-orientation">Desbloquear Orientación</button>
+            <div class="status info" id="lock-status">La orientación no está bloqueada</div>
+        </div>
+        
+        <div class="test-section">
+            <h2>Prueba de Rotación de Imagen</h2>
+            <div>
+                <img id="test-image" src="img/LOGO GDR.jpeg" alt="Imagen de prueba" style="max-width: 100%; height: auto; border: 1px solid #ccc;">
+            </div>
+            <button id="rotate-left">Rotar Izquierda (-90°)</button>
+            <button id="rotate-right">Rotar Derecha (+90°)</button>
+            <button id="reset-rotation">Resetear Rotación</button>
+            <div class="status info" id="rotation-status">Rotación actual: 0°</div>
+        </div>
+        
+        <div class="test-section">
+            <h2>Funcionalidad Adicional</h2>
+            <p>La funcionalidad completa está implementada en la aplicación principal (index.html). Esta página de prueba solo verifica que:</p>
+            <ul>
+                <li>El bloqueo de orientación funcione correctamente</li>
+                <li>Los controles de rotación de imagen estén disponibles</li>
+                <li>Las etiquetas se mantengan horizontales después de la rotación</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // DOM elements
+        const orientationDisplay = document.getElementById('orientation-display');
+        const orientationStatus = document.getElementById('orientation-status');
+        const lockPortraitBtn = document.getElementById('lock-portrait');
+        const lockLandscapeBtn = document.getElementById('lock-landscape');
+        const unlockOrientationBtn = document.getElementById('unlock-orientation');
+        const lockStatus = document.getElementById('lock-status');
+        const testImage = document.getElementById('test-image');
+        const rotateLeftBtn = document.getElementById('rotate-left');
+        const rotateRightBtn = document.getElementById('rotate-right');
+        const resetRotationBtn = document.getElementById('reset-rotation');
+        const rotationStatus = document.getElementById('rotation-status');
+        
+        // Track rotation angle
+        let rotationAngle = 0;
+        
+        // Update orientation display
+        function updateOrientationDisplay() {
+            let currentOrientation = 'Desconocida';
+            let orientationStatusText = '';
+            
+            if (window.screen && window.screen.orientation) {
+                currentOrientation = window.screen.orientation.angle + '° (' + window.screen.orientation.type + ')';
+                
+                if (window.screen.orientation.type === 'portrait-primary' || window.screen.orientation.type === 'portrait-secondary') {
+                    orientationStatusText = 'La orientación actual es vertical. La aplicación debería mantenerse en este modo.';
+                } else {
+                    orientationStatusText = 'La orientación actual es horizontal. La aplicación intentará rotar a vertical.';
+                }
+            } else {
+                // Fallback for browsers that don't support Screen Orientation API
+                if (window.innerHeight > window.innerWidth) {
+                    currentOrientation = 'vertical (aproximado)';
+                    orientationStatusText = 'La orientación parece ser vertical.';
+                } else {
+                    currentOrientation = 'horizontal (aproximado)';
+                    orientationStatusText = 'La orientación parece ser horizontal.';
+                }
+            }
+            
+            orientationDisplay.textContent = `Orientación actual: ${currentOrientation}`;
+            orientationStatus.textContent = orientationStatusText;
+        }
+        
+        // Lock to portrait orientation
+        function lockToPortrait() {
+            if (screen.orientation && screen.orientation.lock) {
+                screen.orientation.lock('portrait')
+                    .then(() => {
+                        lockStatus.textContent = 'Orientación bloqueada a vertical';
+                        lockStatus.className = 'status success';
+                    })
+                    .catch(error => {
+                        lockStatus.textContent = `Error al bloquear orientación: ${error.message}`;
+                        lockStatus.className = 'status info';
+                    });
+            } else {
+                lockStatus.textContent = 'API de orientación de pantalla no soportada en este navegador';
+                lockStatus.className = 'status info';
+            }
+        }
+        
+        // Lock to landscape orientation
+        function lockToLandscape() {
+            if (screen.orientation && screen.orientation.lock) {
+                screen.orientation.lock('landscape')
+                    .then(() => {
+                        lockStatus.textContent = 'Orientación bloqueada a horizontal';
+                        lockStatus.className = 'status success';
+                    })
+                    .catch(error => {
+                        lockStatus.textContent = `Error al bloquear orientación: ${error.message}`;
+                        lockStatus.className = 'status info';
+                    });
+            } else {
+                lockStatus.textContent = 'API de orientación de pantalla no soportada en este navegador';
+                lockStatus.className = 'status info';
+            }
+        }
+        
+        // Unlock orientation
+        function unlockOrientation() {
+            if (screen.orientation && screen.orientation.unlock) {
+                screen.orientation.unlock();
+                lockStatus.textContent = 'Orientación desbloqueada';
+                lockStatus.className = 'status info';
+            } else {
+                lockStatus.textContent = 'API de orientación de pantalla no soportada en este navegador';
+                lockStatus.className = 'status info';
+            }
+        }
+        
+        // Rotate image left (counter-clockwise)
+        function rotateImageLeft() {
+            rotationAngle = (rotationAngle - 90) % 360;
+            if (rotationAngle < 0) rotationAngle += 360;
+            updateImageRotation();
+        }
+        
+        // Rotate image right (clockwise)
+        function rotateImageRight() {
+            rotationAngle = (rotationAngle + 90) % 360;
+            updateImageRotation();
+        }
+        
+        // Reset image rotation
+        function resetImageRotation() {
+            rotationAngle = 0;
+            updateImageRotation();
+        }
+        
+        // Update image rotation in the UI
+        function updateImageRotation() {
+            testImage.style.transform = `rotate(${rotationAngle}deg)`;
+            rotationStatus.textContent = `Rotación actual: ${rotationAngle}°`;
+        }
+        
+        // Set up event listeners
+        lockPortraitBtn.addEventListener('click', lockToPortrait);
+        lockLandscapeBtn.addEventListener('click', lockToLandscape);
+        unlockOrientationBtn.addEventListener('click', unlockOrientation);
+        rotateLeftBtn.addEventListener('click', rotateImageLeft);
+        rotateRightBtn.addEventListener('click', rotateImageRight);
+        resetRotationBtn.addEventListener('click', resetImageRotation);
+        
+        // Update orientation display on load and when orientation changes
+        window.addEventListener('load', updateOrientationDisplay);
+        
+        if (window.screen && window.screen.orientation) {
+            window.screen.orientation.addEventListener('change', updateOrientationDisplay);
+        }
+        
+        // Also check orientation on resize (for browsers without orientation API)
+        window.addEventListener('resize', updateOrientationDisplay);
+    </script>
+</body>
+</html>
