@@ -1,94 +1,125 @@
-const CACHE_NAME = 'gdr-cam-v40'; // Incremented version
-const STATIC_ASSETS = [
-  '/',
-  'index.html',
-  'app.js',
-  'style.css',
-  'exif.js',
-  'piexif.js',
-  'img/LOGO GDR.jpeg',
-  'img/icon-512x512.png',
-  'img/ECUACORRIENTE.png',
-  'manifest.json',
-  'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css',
-  'https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap'
+const CACHE_NAME = 'gdr-cam-v41';
+const STATIC_CACHE_NAME = 'gdr-cam-static-v41';
+const RUNTIME_CACHE_NAME = 'gdr-cam-runtime-v41';
+
+const urlsToCache = [
+  './',
+  './index.html',
+  './app.js',
+  './style.css',
+  './exif.js',
+  './piexif.js',
+  './manifest.json',
+  './img/LOGO GDR.jpeg',
+  './img/icon-512x512.png',
+  './img/ECUACORRIENTE.png'
 ];
 
-// Install service worker and cache static assets
+// Install event - cache static assets
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
+    caches.open(STATIC_CACHE_NAME)
       .then((cache) => {
-        console.log('Opened cache');
-        return cache.addAll(STATIC_ASSETS);
+        console.log('Static assets cached');
+        // Add critical assets to the static cache
+        return cache.addAll(urlsToCache);
       })
       .catch(error => {
-        console.error('Failed to open cache during install:', error);
-        throw error;
+        console.error('Failed to cache static assets during install:', error);
+        // Don't throw error to allow service worker installation to continue
       })
   );
+  // Force the waiting service worker to become the active service worker
+  self.skipWaiting();
 });
 
-// Activate service worker and clean up old caches
+// Activate event - clean up old caches
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
+          if (cacheName !== STATIC_CACHE_NAME && cacheName !== RUNTIME_CACHE_NAME) {
             console.log('Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
       );
-    }).then(() => {
-      console.log('Service worker activated and old caches cleaned');
-      return self.clients.claim(); // Take control of all clients immediately
     })
   );
+  // Take control of all clients immediately
+  self.clients.claim();
 });
 
-// Fetch event with Stale-While-Revalidate strategy
+// Fetch event - handle different types of requests with appropriate strategies
 self.addEventListener('fetch', (event) => {
-  // For navigation requests, use Network Falling Back to Cache
-  if (event.request.mode === 'navigate') {
+  const requestUrl = new URL(event.request.url);
+  const isSameOrigin = self.location.origin === requestUrl.origin;
+  const isNavigation = event.request.mode === 'navigate';
+
+  // Handle navigation requests (HTML pages) with network-first strategy with fallback
+  if (isNavigation) {
     event.respondWith(
-      fetch(event.request)
-        .then(response => {
-          // If the network is available, cache the new response and return it
-          return caches.open(CACHE_NAME).then(cache => {
-            cache.put(event.request, response.clone());
-            return response;
+      fetch(event.request).then(response => {
+        // If request was successful, cache the response
+        if (response.status === 200) {
+          const responseClone = response.clone();
+          caches.open(RUNTIME_CACHE_NAME).then(cache => {
+            cache.put(event.request, responseClone);
           });
-        })
-        .catch(() => {
-          // If the network fails, return the cached version
-          return caches.match(event.request);
-        })
-    );
-    return;
-  }
-
-  // For other requests (static assets), use Stale-While-Revalidate
-  event.respondWith(
-    caches.match(event.request)
-      .then((cachedResponse) => {
-        const fetchPromise = fetch(event.request).then((networkResponse) => {
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, networkResponse.clone());
-          });
-          return networkResponse;
-        });
-
-        // Return cached response immediately, while the network request runs in the background
-        return cachedResponse || fetchPromise;
-      })
-      .catch(error => {
-        console.error('Fetch failed:', error);
-        // Provide a fallback for images if they fail
-        if (event.request.destination === 'image') {
-          return caches.match('img/icon-512x512.png'); // A placeholder image
         }
+        return response;
+      }).catch(() => {
+        // Fallback to cached navigation response or index.html
+        return caches.match(event.request)
+          .then(cachedResponse => {
+            if (cachedResponse) {
+              return cachedResponse;
+            }
+            // If no specific cached response, return index.html
+            return caches.match('./index.html');
+          });
       })
-  );
+    );
+  } 
+  // Handle API requests or cross-origin requests with network-first strategy
+  else if (!isSameOrigin) {
+    event.respondWith(
+      fetch(event.request).catch(() => {
+        return caches.match(event.request);
+      })
+    );
+  } 
+  // Handle static assets with cache-first strategy for same-origin requests
+  else {
+    event.respondWith(
+      caches.match(event.request).then(cachedResponse => {
+        if (cachedResponse) {
+          return cachedResponse;
+        }
+
+        // If not in cache, fetch from network
+        return fetch(event.request).then(networkResponse => {
+          // Only cache successful responses with valid content
+          if (networkResponse.status === 200 && 
+              networkResponse.type !== 'opaque' && 
+              networkResponse.type !== 'opaqueredirect') {
+            // Clone the response before caching to allow the original to be used
+            const responseToCache = networkResponse.clone();
+            caches.open(RUNTIME_CACHE_NAME).then(cache => {
+              cache.put(event.request, responseToCache);
+            });
+          }
+          return networkResponse;
+        }).catch(error => {
+          console.error('Network request failed:', event.request.url, error);
+          // Return error response if no fallback available
+          return new Response('', {
+            status: 503,
+            statusText: 'Service Unavailable'
+          });
+        });
+      })
+    );
+  }
 });
