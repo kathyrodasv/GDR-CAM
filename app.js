@@ -675,6 +675,59 @@ function stopLocationWatching() {
     }
 }
 
+// Function to crop an image to a specific aspect ratio (e.g., 16:9)
+function cropToAspectRatio(imageDataUrl) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+            const originalWidth = img.width;
+            const originalHeight = img.height;
+
+            // Determine if the image is portrait or landscape
+            const isPortrait = originalHeight > originalWidth;
+            const targetAspectRatio = isPortrait ? 9 / 16 : 16 / 9;
+
+            const originalAspectRatio = originalWidth / originalHeight;
+
+            // If the aspect ratio is already correct (with a small tolerance), no need to crop
+            if (Math.abs(originalAspectRatio - targetAspectRatio) < 0.01) {
+                resolve(imageDataUrl);
+                return;
+            }
+
+            let sx, sy, sWidth, sHeight;
+
+            // Calculate cropping dimensions
+            if (originalAspectRatio > targetAspectRatio) {
+                // Image is wider than target, crop width (horizontal crop)
+                sHeight = originalHeight;
+                sWidth = originalHeight * targetAspectRatio;
+                sx = (originalWidth - sWidth) / 2;
+                sy = 0;
+            } else {
+                // Image is taller than target, crop height (vertical crop)
+                sWidth = originalWidth;
+                sHeight = originalWidth / targetAspectRatio;
+                sx = 0;
+                sy = (originalHeight - sHeight) / 2;
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = sWidth;
+            canvas.height = sHeight;
+            const ctx = canvas.getContext('2d');
+
+            // Draw the cropped portion of the image onto the canvas
+            ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, sWidth, sHeight);
+
+            // Get the cropped image as a data URL
+            resolve(canvas.toDataURL('image/jpeg', 0.98));
+        };
+        img.onerror = () => reject(new Error('Error al cargar la imagen para recortar.'));
+        img.src = imageDataUrl;
+    });
+}
+
 // Take photo
 async function takePhoto() {
     const processImage = async (imageSource) => {
@@ -702,7 +755,14 @@ async function takePhoto() {
                 // If orientation correction fails, use the original image
             }
 
-            appState.capturedPhotoDataUrl = imageDataUrl;
+            // Crop the image to 16:9 or 9:16 aspect ratio
+            try {
+                const croppedImageDataUrl = await cropToAspectRatio(imageDataUrl);
+                appState.capturedPhotoDataUrl = croppedImageDataUrl;
+            } catch (cropError) {
+                console.error('Error al recortar la imagen:', cropError);
+                appState.capturedPhotoDataUrl = imageDataUrl; // Use uncropped image on error
+            }
 
             // Stop video tracks properly
             if (appState.stream) {
