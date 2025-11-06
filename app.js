@@ -1249,11 +1249,18 @@ async function rotateImage(angle) {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         
-        // Calculate new canvas dimensions based on rotation
-        if (angle === 90 || angle === -90 || angle === 270 || angle === -270) {
+        // Determine original aspect ratio to preserve it
+        const isOriginalPortrait = img.height > img.width;
+
+        // Calculate new canvas dimensions based on rotation, preserving aspect ratio
+        const needsDimensionSwap = Math.abs(angle) === 90 || Math.abs(angle) === 270;
+
+        if (needsDimensionSwap) {
+            // Swap dimensions for 90/270 degree rotations
             canvas.width = img.height;
             canvas.height = img.width;
         } else {
+            // Keep original dimensions for 180 degree rotations
             canvas.width = img.width;
             canvas.height = img.height;
         }
@@ -1440,20 +1447,9 @@ async function addTimestampAndLogoToImage(imageUrl) {
             // Draw the image on the canvas
             ctx.drawImage(img, 0, 0);
             
-            // Add the logo, north direction indicator, and timestamp to the image when saving 
-            const logo = new Image();
-            logo.onload = function() {
-                const logoHeight = Math.min(320, canvas.height * 0.15); // Make logo proportional to image
-                const logoAspectRatio = logo.width / logo.height;
-                const logoWidth = logoHeight * logoAspectRatio;
+            // Add the north direction indicator, and timestamp to the image when saving
+            const drawOverlays = () => {
                 const padding = Math.min(25, canvas.width * 0.02, canvas.height * 0.02); // Make padding proportional to image
-
-                // Calculate positions for the logo in the bottom-left corner of the canvas
-                const logoX = padding;
-                const logoY = canvas.height - logoHeight - padding;
-                
-                // Draw logo with proper positioning
-                ctx.drawImage(logo, logoX, logoY, logoWidth, logoHeight);
 
                 // Draw north direction indicator in the bottom center with white text and black outline
                 const fontSize = Math.min(80, Math.max(20, Math.floor(canvas.height * 0.04))); // Scale font with image size
@@ -1547,103 +1543,7 @@ async function addTimestampAndLogoToImage(imageUrl) {
                 resolve(imageWithExif);
             };
             
-            logo.onerror = function() {
-                // If the logo fails to load, still draw the timestamp and north indicator
-                const fontSize = Math.min(80, Math.max(20, Math.floor(canvas.height * 0.04))); // Scale font with image size
-                const padding = Math.min(25, canvas.width * 0.02, canvas.height * 0.02); // Make padding proportional to image
-                
-                // Draw north direction indicator in the bottom center with white text and black outline
-                ctx.font = `bold ${fontSize}px Arial`;
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'bottom';
-
-                const centerX = canvas.width / 2;
-                const northY = canvas.height - padding;
-                
-                // Extract GPS data from EXIF if available
-                let gpsInfo = 'N'; // Default if no GPS data
-                if (exifObj.GPS) {
-                    // Get GPS coordinates from EXIF data
-                    let lat = null, lng = null;
-                    let latRef = null, lngRef = null;
-                    
-                    // Process GPS coordinates from EXIF
-                    if (exifObj.GPS[piexif.GPSIFD.GPSLatitude]) {
-                        const gpsLat = exifObj.GPS[piexif.GPSIFD.GPSLatitude];
-                        if (Array.isArray(gpsLat) && gpsLat.length === 3) {
-                            // Calculate decimal degrees from DMS (Degrees, Minutes, Seconds)
-                            const deg = gpsLat[0][0] / gpsLat[0][1];
-                            const min = gpsLat[1][0] / gpsLat[1][1];
-                            const sec = gpsLat[2][0] / gpsLat[2][1];
-                            lat = deg + (min / 60) + (sec / 3600);
-                        }
-                    }
-                    
-                    if (exifObj.GPS[piexif.GPSIFD.GPSLongitude]) {
-                        const gpsLng = exifObj.GPS[piexif.GPSIFD.GPSLongitude];
-                        if (Array.isArray(gpsLng) && gpsLng.length === 3) {
-                            // Calculate decimal degrees from DMS (Degrees, Minutes, Seconds)
-                            const deg = gpsLng[0][0] / gpsLng[0][1];
-                            const min = gpsLng[1][0] / gpsLng[1][1];
-                            const sec = gpsLng[2][0] / gpsLng[2][1];
-                            lng = deg + (min / 60) + (sec / 3600);
-                        }
-                    }
-                    
-                    latRef = exifObj.GPS[piexif.GPSIFD.GPSLatitudeRef];
-                    lngRef = exifObj.GPS[piexif.GPSIFD.GPSLongitudeRef];
-                    
-                    // Format GPS coordinates if available with higher precision
-                    if (lat !== null && lng !== null && latRef && lngRef) {
-                        gpsInfo = `N ${Math.abs(lat).toFixed(6)}° ${latRef}, ${Math.abs(lng).toFixed(6)}° ${lngRef}`;
-                        
-                        // If accuracy is available, add it to the display
-                        if (exifObj.GPS[piexif.GPSIFD.GPSDOP]) {
-                            const dop = exifObj.GPS[piexif.GPSIFD.GPSDOP];
-                            if (Array.isArray(dop) && dop[1] !== 0) {
-                                const accuracy = (dop[0] / dop[1]).toFixed(1);
-                                gpsInfo += ` (±${accuracy}m)`;
-                            }
-                        }
-                    }
-                }
-                
-                // Draw a simple north arrow symbol above the GPS info with white color and black outline
-                ctx.strokeStyle = 'black'; // Black outline
-                ctx.lineWidth = 2; // Outline thickness
-                ctx.fillStyle = 'white'; // White fill color
-                ctx.strokeText('⬆', centerX, northY - fontSize * 0.8);
-                ctx.fillText('⬆', centerX, northY - fontSize * 0.8);
-                
-                // Draw GPS info with white color and black outline
-                ctx.strokeText(gpsInfo, centerX, northY);
-                ctx.fillText(gpsInfo, centerX, northY);
-
-                // Prepare to draw timestamp text in the bottom-right corner with white text and black outline
-                ctx.textAlign = 'right';
-                ctx.textBaseline = 'bottom';
-
-                const timestampX = canvas.width - padding;
-                const timestampY = canvas.height - padding;
-                
-                // Draw timestamp with white color and black outline
-                ctx.strokeStyle = 'black'; // Black outline
-                ctx.lineWidth = 2; // Outline thickness
-                ctx.fillStyle = 'white'; // White fill color
-                ctx.strokeText(timestamp, timestampX, timestampY);
-                ctx.fillText(timestamp, timestampX, timestampY);
-
-                // Convert canvas back to data URL
-                const imageWithText = canvas.toDataURL('image/jpeg', 0.98);
-                
-                // Reinsert the original EXIF data into the image with text
-                const exifBytes = piexif.dump(exifObj);
-                const imageWithExif = piexif.insert(exifBytes, imageWithText);
-                
-                resolve(imageWithExif);
-            };
-            
-            logo.src = 'img/LOGO GDR.jpeg';
+            drawOverlays();
         };
         
         img.onerror = function() {
@@ -1695,20 +1595,9 @@ async function applyRotationToImage(imageUrl, rotationAngle) {
             // Restore the initial context state to draw text and logo in horizontal orientation
             ctx.restore();
             
-            // Draw the logo, north direction indicator, and timestamp horizontally on the rotated image when saving
-            const logo = new Image();
-            logo.onload = function() {
-                const logoHeight = Math.min(320, canvas.height * 0.15); // Make logo proportional to image
-                const logoAspectRatio = logo.width / logo.height;
-                const logoWidth = logoHeight * logoAspectRatio;
+            // Draw the north direction indicator, and timestamp horizontally on the rotated image when saving
+            const drawOverlays = () => {
                 const padding = Math.min(25, canvas.width * 0.02, canvas.height * 0.02); // Make padding proportional to image
-
-                // Calculate positions for the logo in the bottom-left corner of the canvas
-                const logoX = padding;
-                const logoY = canvas.height - logoHeight - padding;
-                
-                // Draw logo with proper positioning
-                ctx.drawImage(logo, logoX, logoY, logoWidth, logoHeight);
 
                 // Draw north direction indicator in the bottom center with white text and black outline
                 const fontSize = Math.min(80, Math.max(20, Math.floor(canvas.height * 0.04))); // Scale font with image size
@@ -1802,103 +1691,7 @@ async function applyRotationToImage(imageUrl, rotationAngle) {
                 resolve(imageWithExif);
             };
             
-            logo.onerror = function() {
-                // If the logo fails to load, still draw the timestamp and north indicator
-                const fontSize = Math.min(80, Math.max(20, Math.floor(canvas.height * 0.04))); // Scale font with image size
-                const padding = Math.min(25, canvas.width * 0.02, canvas.height * 0.02); // Make padding proportional to image
-                
-                // Draw north direction indicator in the bottom center with white text and black outline
-                ctx.font = `bold ${fontSize}px Arial`;
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'bottom';
-
-                const centerX = canvas.width / 2;
-                const northY = canvas.height - padding;
-                
-                // Extract GPS data from EXIF if available
-                let gpsInfo = 'N'; // Default if no GPS data
-                if (exifObj.GPS) {
-                    // Get GPS coordinates from EXIF data
-                    let lat = null, lng = null;
-                    let latRef = null, lngRef = null;
-                    
-                    // Process GPS coordinates from EXIF
-                    if (exifObj.GPS[piexif.GPSIFD.GPSLatitude]) {
-                        const gpsLat = exifObj.GPS[piexif.GPSIFD.GPSLatitude];
-                        if (Array.isArray(gpsLat) && gpsLat.length === 3) {
-                            // Calculate decimal degrees from DMS (Degrees, Minutes, Seconds)
-                            const deg = gpsLat[0][0] / gpsLat[0][1];
-                            const min = gpsLat[1][0] / gpsLat[1][1];
-                            const sec = gpsLat[2][0] / gpsLat[2][1];
-                            lat = deg + (min / 60) + (sec / 3600);
-                        }
-                    }
-                    
-                    if (exifObj.GPS[piexif.GPSIFD.GPSLongitude]) {
-                        const gpsLng = exifObj.GPS[piexif.GPSIFD.GPSLongitude];
-                        if (Array.isArray(gpsLng) && gpsLng.length === 3) {
-                            // Calculate decimal degrees from DMS (Degrees, Minutes, Seconds)
-                            const deg = gpsLng[0][0] / gpsLng[0][1];
-                            const min = gpsLng[1][0] / gpsLng[1][1];
-                            const sec = gpsLng[2][0] / gpsLng[2][1];
-                            lng = deg + (min / 60) + (sec / 3600);
-                        }
-                    }
-                    
-                    latRef = exifObj.GPS[piexif.GPSIFD.GPSLatitudeRef];
-                    lngRef = exifObj.GPS[piexif.GPSIFD.GPSLongitudeRef];
-                    
-                    // Format GPS coordinates if available with higher precision
-                    if (lat !== null && lng !== null && latRef && lngRef) {
-                        gpsInfo = `N ${Math.abs(lat).toFixed(6)}° ${latRef}, ${Math.abs(lng).toFixed(6)}° ${lngRef}`;
-                        
-                        // If accuracy is available, add it to the display
-                        if (exifObj.GPS[piexif.GPSIFD.GPSDOP]) {
-                            const dop = exifObj.GPS[piexif.GPSIFD.GPSDOP];
-                            if (Array.isArray(dop) && dop[1] !== 0) {
-                                const accuracy = (dop[0] / dop[1]).toFixed(1);
-                                gpsInfo += ` (±${accuracy}m)`;
-                            }
-                        }
-                    }
-                }
-                
-                // Draw a simple north arrow symbol above the GPS info with white color and black outline
-                ctx.strokeStyle = 'black'; // Black outline
-                ctx.lineWidth = 2; // Outline thickness
-                ctx.fillStyle = 'white'; // White fill color
-                ctx.strokeText('⬆', centerX, northY - fontSize * 0.8);
-                ctx.fillText('⬆', centerX, northY - fontSize * 0.8);
-                
-                // Draw GPS info with white color and black outline
-                ctx.strokeText(gpsInfo, centerX, northY);
-                ctx.fillText(gpsInfo, centerX, northY);
-
-                // Prepare to draw timestamp text in the bottom-right corner with white text and black outline
-                ctx.textAlign = 'right';
-                ctx.textBaseline = 'bottom';
-
-                const timestampX = canvas.width - padding;
-                const timestampY = canvas.height - padding;
-                
-                // Draw timestamp with white color and black outline
-                ctx.strokeStyle = 'black'; // Black outline
-                ctx.lineWidth = 2; // Outline thickness
-                ctx.fillStyle = 'white'; // White fill color
-                ctx.strokeText(timestamp, timestampX, timestampY);
-                ctx.fillText(timestamp, timestampX, timestampY);
-
-                // Convert canvas back to data URL
-                const rotatedImageWithText = canvas.toDataURL('image/jpeg', 0.98);
-                
-                // Reinsert the original EXIF data into the rotated image with text
-                const exifBytes = piexif.dump(exifObj);
-                const imageWithExif = piexif.insert(exifBytes, rotatedImageWithText);
-                
-                resolve(imageWithExif);
-            };
-            
-            logo.src = 'img/LOGO GDR.jpeg';
+            drawOverlays();
         };
         
         img.onerror = function() {
