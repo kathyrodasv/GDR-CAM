@@ -839,7 +839,7 @@ function handleSaveMetadata() {
     const activityPerformed = document.getElementById('activity-performed').value;
     const observationCategory = document.getElementById('observation-category').value;
     
-    if (!workFront || !coronation || !activityPerformed || !observationCategory) {
+    if (!workFront || !coronation || !observationCategory) {
         showStatus('Por favor complete todos los campos del formulario.', 'error');
         return;
     }
