@@ -1031,7 +1031,7 @@ async function addMetadataToImage(imageDataUrl, metadata) {
         if (typeof piexif !== 'undefined' && piexif.dump) {
             try {
                 console.log("Loading EXIF data from image...");
-                let exifObj = piexif.load(timestampedImage);
+                let exifObj = piexif.load(imageDataUrl);
                 console.log("EXIF data loaded:", JSON.parse(JSON.stringify(exifObj)));
 
                 if (!exifObj) {
