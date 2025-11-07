@@ -468,9 +468,9 @@ async function startCamera() {
         let constraints = { 
             video: { 
                 facingMode: 'environment',
-                width: { ideal: 4096 },  // Maximum resolution available
-                height: { ideal: 2160 },
-                aspectRatio: { ideal: 16/9 }
+                width: { ideal: 1920 },  // Reducido a Full HD para mayor velocidad
+                height: { ideal: 1080 },
+                aspectRatio: { ideal: 16/9 } // Mantener el aspect ratio
             } 
         };
         
@@ -489,8 +489,8 @@ async function startCamera() {
                     const constraintsAlt = { 
                         video: { 
                             facingMode: 'user',
-                            width: { ideal: 4096 },
-                            height: { ideal: 2160 },
+                            width: { ideal: 1920 },
+                            height: { ideal: 1080 },
                             aspectRatio: { ideal: 16/9 }
                         } 
                     };
@@ -764,7 +764,7 @@ function cropToAspectRatio(imageDataUrl) {
             ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, sWidth, sHeight);
 
             // Get the cropped image as a data URL
-            resolve(canvas.toDataURL('image/jpeg', 0.98));
+            resolve(canvas.toDataURL('image/jpeg', 0.92)); // Calidad reducida para mayor velocidad
         };
         img.onerror = () => reject(new Error('Error al cargar la imagen para recortar.'));
         img.src = imageDataUrl;
@@ -793,7 +793,7 @@ async function takePhoto() {
             context.drawImage(imageSource, 0, 0, width, height);
             
             // Capture with maximum quality (98%)
-            let imageDataUrl = canvas.toDataURL('image/jpeg', 0.98);
+            let imageDataUrl = canvas.toDataURL('image/jpeg', 0.92); // Calidad reducida para mayor velocidad
 
             // Correct the image orientation based on EXIF data before storing
             try {
@@ -842,9 +842,9 @@ async function takePhoto() {
     if (appState.imageCapture) {
         // Set up options for maximum image quality
         const photoSettings = {
-            imageWidth: 4096,  // Maximum resolution
-            imageHeight: 2160,
-            fillLightMode: 'auto'  // Adjust according to lighting conditions
+            imageWidth: 1920,  // Reducido a Full HD
+            imageHeight: 1080,
+            fillLightMode: 'auto'
         };
         
         appState.imageCapture.takePhoto(photoSettings)
@@ -1044,8 +1044,8 @@ function correctImageOrientation(imageDataUrl) {
                 ctx.drawImage(img, 0, 0, img.width, img.height);
                 ctx.restore();
                 
-                // Convert canvas back to data URL
-                const correctedImage = canvas.toDataURL('image/jpeg', 0.98);
+                // Convert canvas back to data URL with slightly lower quality for speed
+                const correctedImage = canvas.toDataURL('image/jpeg', 0.92);
                 resolve(correctedImage);
             });
         };
@@ -1132,7 +1132,7 @@ function drawTimestampAndLogoOnImage(imageDataUrl, timestamp) {
 
             // For the preview, we don't add the timestamp and logo immediately
             // Instead, we'll add them later after the user confirms the orientation
-            resolve(canvas.toDataURL('image/jpeg', 0.98));
+            resolve(canvas.toDataURL('image/jpeg', 0.92));
         };
         
         img.onerror = function() {
@@ -1421,7 +1421,7 @@ async function rotateImage(angle) {
         ctx.restore();
         
         // Convert canvas back to data URL without adding timestamp/logo
-        const rotatedImage = canvas.toDataURL('image/jpeg', 0.98);
+        const rotatedImage = canvas.toDataURL('image/jpeg', 0.92);
         
         // Reinsert the original EXIF data into the rotated image
         const exifBytes = piexif.dump(exifObj);
@@ -1684,7 +1684,7 @@ async function addTimestampAndLogoToImage(imageUrl) {
                 ctx.fillText(timestamp, timestampX, timestampY);
 
                 // Convert canvas back to data URL
-                const imageWithText = canvas.toDataURL('image/jpeg', 0.98);
+                const imageWithText = canvas.toDataURL('image/jpeg', 0.92);
                 
                 // Reinsert the original EXIF data into the image with text
                 const exifBytes = piexif.dump(exifObj);
@@ -1832,7 +1832,7 @@ async function applyRotationToImage(imageUrl, rotationAngle) {
                 ctx.fillText(timestamp, timestampX, timestampY);
 
                 // Convert canvas back to data URL
-                const rotatedImageWithText = canvas.toDataURL('image/jpeg', 0.98);
+                const rotatedImageWithText = canvas.toDataURL('image/jpeg', 0.92);
                 
                 // Reinsert the original EXIF data into the rotated image with text
                 const exifBytes = piexif.dump(exifObj);
