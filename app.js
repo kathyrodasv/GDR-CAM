@@ -16,7 +16,8 @@ const appState = {
     maxZoom: 1.0, // Maximum available zoom level
     zoomSupported: false, // Whether zoom is supported by the camera
     isGpsDisplayThrottled: false, // Flag to throttle GPS display updates
-    gpsDisplayThrottleTime: 5000 // Throttle GPS display updates to every 5 seconds
+    gpsDisplayThrottleTime: 5000, // Throttle GPS display updates to every 5 seconds
+    isFormInteractionActive: false // Flag to pause background updates during form interaction
 };
 
 // DOM Elements
@@ -38,6 +39,8 @@ const elements = {
     saveWithoutFormBtn: null,  // Added this to track the save without form button
     rotateLeftBtn: null,
     rotateRightBtn: null,
+    otherWorkFrontGroup: null, // For the custom work front input
+    otherWorkFrontInput: null,
 };
 
 // Initialize the application
@@ -61,6 +64,8 @@ function init() {
     elements.zoomInBtn = document.getElementById('zoom-in');
     elements.zoomOutBtn = document.getElementById('zoom-out');
     elements.zoomLevelDisplay = document.getElementById('zoom-level');
+    elements.otherWorkFrontGroup = document.getElementById('other-work-front-group');
+    elements.otherWorkFrontInput = document.getElementById('other-work-front');
     
     // Initialize zoom controls
     initializeZoomControls();
@@ -253,6 +258,30 @@ function attachEventListeners() {
     elements.zoomOutBtn.addEventListener('click', zoomOut);
     elements.saveMetadataBtn.addEventListener('click', handleSaveMetadata);
     
+    // Event listener for the work front dropdown
+    const workFrontSelect = document.getElementById('work-front');
+    workFrontSelect.addEventListener('change', () => {
+        if (workFrontSelect.value === 'otro') {
+            elements.otherWorkFrontGroup.classList.remove('hidden');
+        } else {
+            elements.otherWorkFrontGroup.classList.add('hidden');
+        }
+    });
+
+    // Add event listeners to form inputs to prevent background updates from interfering
+    const formInputs = document.querySelectorAll('#form-section select, #form-section input, #form-section textarea');
+    formInputs.forEach(input => {
+        // When user focuses on an input, pause background UI updates
+        input.addEventListener('focus', () => {
+            appState.isFormInteractionActive = true;
+        });
+        
+        // When user leaves an input, resume background UI updates
+        input.addEventListener('blur', () => {
+            appState.isFormInteractionActive = false;
+        });
+    });
+
     // Add event listener for saving photo without form (only GPS and timestamp)
     elements.saveWithoutFormBtn.addEventListener('click', () => {
         // Use the best location found during the form filling period
@@ -658,7 +687,8 @@ function startLocationWatching(gpsDisplay) {
             // Update the display with the latest best location
             if (gpsDisplay && appState.bestLocation) {
                 // Throttle UI updates to prevent performance issues from frequent DOM manipulation.
-                if (!appState.isGpsDisplayThrottled) {
+                // Also, pause updates if the user is interacting with the form to prevent dropdowns from closing on iOS.
+                if (!appState.isGpsDisplayThrottled && !appState.isFormInteractionActive) {
                     gpsDisplay.value = `${appState.bestLocation.latitude.toFixed(7)}, ${appState.bestLocation.longitude.toFixed(7)} (±${Math.round(appState.bestLocation.accuracy)}m)`;
                     
                     appState.isGpsDisplayThrottled = true;
@@ -876,13 +906,21 @@ async function takePhoto() {
 
 // Handle save metadata
 function handleSaveMetadata() {
-    const workFront = document.getElementById('work-front').value;
+    const workFrontSelect = document.getElementById('work-front');
+    let workFront = workFrontSelect.value;
     const coronation = document.getElementById('coronation').value;
     const activityPerformed = document.getElementById('activity-performed').value;
     const observationCategory = document.getElementById('observation-category').value;
     
-    if (!workFront || !coronation || !observationCategory) {
-        showStatus('Por favor complete todos los campos del formulario.', 'error');
+    // If 'Otro' is selected, get the value from the text input
+    if (workFront === 'otro') {
+        workFront = elements.otherWorkFrontInput.value.trim();
+        if (!workFront) {
+            showStatus('Por favor, especifique el Frente de Trabajo personalizado.', 'error');
+            return;
+        }
+    } else if (!workFront || !coronation || !observationCategory) {
+        showStatus('Por favor complete todos los campos requeridos del formulario.', 'error');
         return;
     }
     
@@ -1413,12 +1451,13 @@ function newCapture() {
     elements.cameraSection.classList.remove('hidden');
     elements.takePhotoBtn.disabled = true;
     
-    // Clear form fields
-    document.getElementById('work-front').value = '';
-    document.getElementById('coronation').value = '';
-    document.getElementById('observation-category').value = '';
-    document.getElementById('activity-performed').value = '';
+    // No limpiar los campos del formulario para mantener los valores anteriores.
+    // Solo limpiar las coordenadas GPS, que se obtendrán de nuevo.
     document.getElementById('gps-coords').value = '';
+
+    // Ocultar el campo de texto "Otro" si estaba visible
+    elements.otherWorkFrontGroup.classList.add('hidden');
+    elements.otherWorkFrontInput.value = '';
     
     // Restore download button text if it was changed
     if (elements.downloadPhotoBtn.innerHTML.includes('Guardando...') || 
