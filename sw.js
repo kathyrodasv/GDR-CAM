@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gdr-cam-v52';
+const CACHE_NAME = 'gdr-cam-v53';
 const STATIC_CACHE_NAME = 'gdr-cam-static-v52';
 const RUNTIME_CACHE_NAME = 'gdr-cam-runtime-v52';
 
