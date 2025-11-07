@@ -768,8 +768,8 @@ async function takePhoto() {
             appState.isCameraActive = false;
             
             // Update the GPS display with the best location found so far
+            const gpsDisplay = document.getElementById('gps-coords');
             if (appState.bestLocation && gpsDisplay) {
-                const gpsDisplay = document.getElementById('gps-coords');
                 gpsDisplay.value = `${appState.bestLocation.latitude.toFixed(7)}, ${appState.bestLocation.longitude.toFixed(7)} (±${Math.round(appState.bestLocation.accuracy)}m)`;
             }
         } catch (error) {
