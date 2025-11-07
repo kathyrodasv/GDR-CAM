@@ -1,6 +1,6 @@
-const CACHE_NAME = 'gdr-cam-v62';
-const STATIC_CACHE_NAME = 'gdr-cam-static-v62';
-const RUNTIME_CACHE_NAME = 'gdr-cam-runtime-v62';
+const CACHE_NAME = 'gdr-cam-v63';
+const STATIC_CACHE_NAME = 'gdr-cam-static-v63';
+const RUNTIME_CACHE_NAME = 'gdr-cam-runtime-v63';
 
 const urlsToCache = [
   './',
@@ -60,25 +60,27 @@ self.addEventListener('fetch', (event) => {
   // Handle navigation requests (HTML pages) with network-first strategy with fallback
   if (isNavigation) {
     event.respondWith(
-      fetch(event.request).then(response => {
-        // If request was successful, cache the response
-        if (response.status === 200) {
-          const responseClone = response.clone();
-          caches.open(RUNTIME_CACHE_NAME).then(cache => {
-            cache.put(event.request, responseClone);
-          });
-        }
-        return response;
-      }).catch(() => {
-        // Fallback to cached navigation response or index.html
-        return caches.match(event.request)
-          .then(cachedResponse => {
-            if (cachedResponse) {
-              return cachedResponse;
-            }
-            // If no specific cached response, return index.html
-            return caches.match('./index.html');
-          });
+      // Strategy: Cache First, then Network. This ensures instant loading.
+      caches.match(event.request).then(cachedResponse => {
+        // Try to fetch a new version from the network in the background.
+        const networkFetch = fetch(event.request).then(networkResponse => {
+          // If the fetch is successful, update the cache.
+          if (networkResponse.status === 200) {
+            const responseToCache = networkResponse.clone();
+            caches.open(RUNTIME_CACHE_NAME).then(cache => {
+              cache.put(event.request, responseToCache);
+            });
+          }
+          // If there was a cached response, we don't need to return the network one here,
+          // as the page is already loading. The update will be applied on next load.
+          return networkResponse;
+        }).catch(error => {
+          console.log('Network fetch for navigation failed, serving from cache.', error);
+        });
+
+        // Return the cached response immediately if it exists, otherwise wait for the network.
+        // If both fail, it will result in an error, but the cache should almost always have index.html.
+        return cachedResponse || networkFetch || caches.match('./index.html');
       })
     );
   } 
