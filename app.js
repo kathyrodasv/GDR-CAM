@@ -639,20 +639,12 @@ function startLocationWatching(gpsDisplay) {
             // Check if this is the best location we've received so far (by accuracy)
             if (!appState.bestLocation || (newPosition.accuracy && newPosition.accuracy < appState.bestLocation.accuracy)) {
                 console.log(`Better location found! Previous: ±${appState.bestLocation.accuracy}m, New: ±${newPosition.accuracy}m`);
-                appState.bestLocation = {...newPosition};
-                
-                // Update the display with the improved accuracy
-                if (gpsDisplay) {
-                    gpsDisplay.value = `${newPosition.latitude.toFixed(7)}, ${newPosition.longitude.toFixed(7)} (±${Math.round(newPosition.accuracy)}m)`;
-                }
-                
-                // Update status to indicate improved accuracy
-                showStatus(`Ubicación actualizada. Mejor precisión: ±${Math.round(newPosition.accuracy)}m`, 'success');
-            } else {
-                // Still update the display if it doesn't already show the accuracy
-                if (gpsDisplay && !gpsDisplay.value.includes('±')) {
-                    gpsDisplay.value = `${newPosition.latitude.toFixed(7)}, ${newPosition.longitude.toFixed(7)} (±${Math.round(newPosition.accuracy)}m)`;
-                }
+                appState.bestLocation = { ...newPosition };
+            }
+
+            // Update the display with the latest best location
+            if (gpsDisplay && appState.bestLocation) {
+                gpsDisplay.value = `${appState.bestLocation.latitude.toFixed(7)}, ${appState.bestLocation.longitude.toFixed(7)} (±${Math.round(appState.bestLocation.accuracy)}m)`;
             }
         },
         (error) => {
@@ -660,9 +652,9 @@ function startLocationWatching(gpsDisplay) {
             // Continue operation even if location updates fail
         },
         {
-            enableHighAccuracy: true,
-            timeout: 30000,      // Timeout for each update
-            maximumAge: 0        // Don't use cached positions
+            enableHighAccuracy: true, // Use GPS for highest accuracy
+            timeout: 30000,           // Timeout for each update
+            maximumAge: 10000         // Accept cached positions up to 10 seconds old to reduce battery/CPU usage
         }
     );
 }
