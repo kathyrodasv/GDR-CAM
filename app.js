@@ -11,6 +11,7 @@ const appState = {
     locationWatcher: null, // Store the GPS watcher ID
     isCameraActive: false,
     imageRotation: 0, // Track current rotation angle
+    permissionDenied: false, // Track if camera permission was denied
     originalPhotoWithMetadata: null, // Store the original image for rotation operations
     currentZoom: 1.0, // Current zoom level
     maxZoom: 1.0, // Maximum available zoom level
@@ -456,6 +457,12 @@ function attachEventListeners() {
 
 // Start camera function
 async function startCamera() {
+    // Si el permiso fue denegado previamente, no intentar de nuevo.
+    if (appState.permissionDenied) {
+        showStatus('El permiso de la cámara fue denegado. Habilítelo en la configuración de su navegador.', 'error');
+        return;
+    }
+
     try {
         // Check if camera access is supported
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -534,8 +541,10 @@ async function startCamera() {
         
         // Handle different types of errors with appropriate messages
         if (err.name === 'NotAllowedError') {
+            appState.permissionDenied = true; // Marcar que el permiso fue denegado
             showStatus('Permiso denegado para acceder a la cámara. Por favor, habilite los permisos y recargue la página.', 'error');
         } else if (err.name === 'NotFoundError') {
+            appState.permissionDenied = true; // No hay cámara, no seguir intentando.
             showStatus('No se encontró ninguna cámara. Asegúrese de que tenga una cámara conectada.', 'error');
         } else if (err.name === 'NotReadableError') {
             showStatus('No se puede acceder a la cámara porque ya está en uso por otra aplicación.', 'error');
@@ -1494,6 +1503,7 @@ function newCapture() {
     appState.imageRotation = 0;
     appState.originalPhotoWithMetadata = null;
     // Limpiar los datos de la foto anterior para liberar memoria
+    appState.permissionDenied = false; // Permitir intentar de nuevo al iniciar nueva captura
     appState.capturedPhotoDataUrl = null;
     appState.photoWithMetadata = null;
     elements.photoPreview.src = ''; // Limpiar la vista previa de la imagen
