@@ -12,6 +12,7 @@ const appState = {
     isCameraActive: false,
     imageRotation: 0, // Track current rotation angle
     permissionDenied: false, // Track if camera permission was denied
+    gpsPermissionDenied: false, // Track if GPS permission was denied
     originalPhotoWithMetadata: null, // Store the original image for rotation operations
     currentZoom: 1.0, // Current zoom level
     maxZoom: 1.0, // Maximum available zoom level
@@ -593,6 +594,15 @@ async function initializeZoomCapabilities(track) {
 function getCurrentLocation() {
     return new Promise((resolve, reject) => {
         const gpsDisplay = document.getElementById('gps-coords');
+
+        // Si el permiso fue denegado previamente, no intentar de nuevo.
+        if (appState.gpsPermissionDenied) {
+            showStatus('Permiso de GPS denegado. Puede tomar la foto sin datos de GPS.', 'error');
+            gpsDisplay.value = 'Permiso de GPS denegado.';
+            elements.takePhotoBtn.disabled = false; // Habilitar de todas formas
+            return resolve(null);
+        }
+
         if (navigator.geolocation) {
             // Use more optimistic timeout settings to allow for more accurate GPS fix
             navigator.geolocation.getCurrentPosition(
@@ -631,6 +641,7 @@ function getCurrentLocation() {
                     switch(error.code) {
                         case error.PERMISSION_DENIED:
                             errorMessage = 'Permiso denegado para acceder a la geolocalización.';
+                            appState.gpsPermissionDenied = true; // Marcar que el permiso fue denegado
                             break;
                         case error.POSITION_UNAVAILABLE:
                             errorMessage = 'La información de ubicación no está disponible.';
@@ -1507,6 +1518,7 @@ function newCapture() {
     appState.originalPhotoWithMetadata = null;
     // Limpiar los datos de la foto anterior para liberar memoria
     appState.permissionDenied = false; // Permitir intentar de nuevo al iniciar nueva captura
+    appState.gpsPermissionDenied = false; // Permitir intentar de nuevo al iniciar nueva captura
     appState.capturedPhotoDataUrl = null;
     appState.photoWithMetadata = null;
     elements.photoPreview.src = ''; // Limpiar la vista previa de la imagen
