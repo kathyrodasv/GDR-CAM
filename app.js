@@ -919,14 +919,9 @@ async function takePhoto() {
     };
 
     if (appState.imageCapture) {
-        // Set up options for maximum image quality
-        const photoSettings = {
-            imageWidth: 3840,  // Aumentado a 4K
-            imageHeight: 2160,
-            fillLightMode: appState.flashModes[appState.currentFlashIndex]
-        };
-        
-        appState.imageCapture.takePhoto(photoSettings)
+        // Use default stream resolution to avoid OverconstrainedError.
+        // The stream is already configured to the best possible resolution in startCamera.
+        appState.imageCapture.takePhoto()
             .then(blob => {
                 const objectURL = URL.createObjectURL(blob);
                 const image = new Image();
@@ -939,37 +934,13 @@ async function takePhoto() {
                     URL.revokeObjectURL(objectURL); // Liberar memoria también en caso de error
                     console.error('Error loading captured photo:', error);
                     showStatus('Error al cargar la foto capturada.', 'error');
-                    // Attempt to restart the camera on loading failure
                     restartCamera();
                 };
             })
             .catch(error => {
                 console.error('Error taking photo:', error);
-                console.log('Trying with default settings...');
-                // If it fails with high-resolution settings, try with default
-                appState.imageCapture.takePhoto()
-                    .then(blob => {
-                        const objectURL = URL.createObjectURL(blob);
-                        const image = new Image();
-                        image.src = objectURL;
-                        image.onload = async () => { // image is the Image object
-                            await processImage(image);
-                            URL.revokeObjectURL(objectURL); // Liberar memoria del Object URL
-                        };
-                        image.onerror = (error) => {
-                            URL.revokeObjectURL(objectURL); // Liberar memoria también en caso de error
-                            console.error('Error loading captured photo with default settings:', error);
-                            showStatus('Error al cargar la foto capturada.', 'error');
-                            // Attempt to restart the camera on loading failure
-                            restartCamera();
-                        };
-                    })
-                    .catch(error2 => {
-                        console.error('Error taking photo with default settings:', error2);
-                        showStatus('Error al tomar la foto. Intente recargar la página.', 'error');
-                        // Attempt to restart the camera on final failure
-                        restartCamera();
-                    });
+                showStatus('Error al tomar la foto. Intente recargar la página.', 'error');
+                restartCamera();
             });
     } else {
         // Fallback for browsers without ImageCapture
