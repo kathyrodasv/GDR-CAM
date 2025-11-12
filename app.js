@@ -539,20 +539,20 @@ async function startCamera() {
         appState.isCameraActive = true; // Set early to prevent multiple concurrent attempts
         
         const constraintAttempts = [
-            // 1. Rear camera, default resolution (most compatible)
-            { video: { facingMode: 'environment' } },
-            // 2. Front camera, default resolution
-            { video: { facingMode: 'user' } },
-            // 3. Any camera, default resolution
-            { video: true },
-            // 4. Rear camera, 1080p (more demanding, but not 4K initially)
-            { video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 }, aspectRatio: { ideal: 16/9 } } },
-            // 5. Front camera, 1080p
-            { video: { facingMode: 'user', width: { ideal: 1920 }, height: { ideal: 1080 }, aspectRatio: { ideal: 16/9 } } },
-            // 6. Rear camera, 4K (highest demand, last resort)
+            // 1. Try rear camera, 4K (Best quality)
             { video: { facingMode: 'environment', width: { ideal: 3840 }, height: { ideal: 2160 }, aspectRatio: { ideal: 16/9 } } },
-            // 7. Front camera, 4K
-            { video: { facingMode: 'user', width: { ideal: 3840 }, height: { ideal: 2160 }, aspectRatio: { ideal: 16/9 } } }
+            // 2. Try rear camera, 1080p
+            { video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 }, aspectRatio: { ideal: 16/9 } } },
+            // 3. Try rear camera, default resolution (High compatibility)
+            { video: { facingMode: 'environment' } },
+            // 4. Try front camera, 4K
+            { video: { facingMode: 'user', width: { ideal: 3840 }, height: { ideal: 2160 }, aspectRatio: { ideal: 16/9 } } },
+            // 5. Try front camera, 1080p
+            { video: { facingMode: 'user', width: { ideal: 1920 }, height: { ideal: 1080 }, aspectRatio: { ideal: 16/9 } } },
+            // 6. Try front camera, default resolution
+            { video: { facingMode: 'user' } },
+            // 7. Try any camera, default resolution (Last resort)
+            { video: true }
         ];
 
         for (let i = 0; i < constraintAttempts.length; i++) {
