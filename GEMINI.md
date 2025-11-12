@@ -1,23 +1,49 @@
 # Project Overview
 
-This project is a Progressive Web Application (PWA) called GDR-CAM, designed for capturing photos with embedded metadata. The application allows users to take pictures, fill out an observation form, and save the image with the form data and GPS coordinates stored as EXIF metadata. The application is designed to work offline.
+This project is a Progressive Web App (PWA) named GDR-CAM, designed for capturing photos and embedding them with EXIF metadata. The application is built using vanilla HTML, CSS, and JavaScript. It allows users to take pictures, fill out a form with observational data, and save the image with the collected information stored as EXIF metadata. The app is designed to work offline and is installable on mobile devices and PCs.
 
-## Main Technologies
+## Key Technologies
 
 *   **Frontend:** HTML5, CSS3, JavaScript
 *   **Camera Access:** `getUserMedia` API
-*   **Metadata:** `exif.js` and `piexif.js` for reading and writing EXIF metadata.
-*   **Offline:** Service Workers (`sw.js`)
+*   **Metadata:** `exif.js` and `piexif.js` libraries for reading and writing EXIF data.
+*   **Offline Functionality:** Service Workers (`sw.js`)
 *   **PWA:** Web App Manifest (`manifest.json`)
 
 ## Architecture
 
-The application is a single-page application (`index.html`) with the core logic in `app.js`. It utilizes a service worker (`sw.js`) for offline caching of assets. The `manifest.json` file enables the PWA functionality.
+The application follows a simple single-page application (SPA) architecture.
+
+*   `index.html`: Defines the UI structure, including the camera view, a form for metadata, and a preview section.
+*   `style.css`: Contains all the styles for the application.
+*   `app.js`: This is the core of the application. It manages the application state, handles user interactions, and orchestrates the process of capturing images, getting GPS data, and embedding metadata.
+*   `exif.js` & `piexif.js`: These are third-party libraries used for handling EXIF metadata.
+*   `sw.js`: The service worker enables offline functionality by caching application assets.
+*   `manifest.json`: This file provides the necessary information for the web app to be installed as a PWA.
 
 # Building and Running
 
-This is a static web project with no build process. To run the application, open the `index.html` file in a modern web browser.
+This is a client-side web application. There is no build process. To run the project, you need to serve the files using a local web server.
 
-## Development Conventions
+1.  **Start a local web server:**
+    You can use any simple web server. For example, if you have Python installed, you can run:
 
-The code is written in plain JavaScript with a focus on DOM manipulation. The application state is managed in a single `appState` object. The code is not modularized into separate files, but rather organized into functions within `app.js`.
+    ```bash
+    python -m http.server
+    ```
+
+    Or, if you have Node.js installed, you can use `http-server`:
+
+    ```bash
+    npx http-server
+    ```
+
+2.  **Open the application:**
+    Open your web browser and navigate to the address provided by the web server (e.g., `http://localhost:8000`).
+
+# Development Conventions
+
+*   **Code Style:** The JavaScript code is written in a procedural style with a global `appState` object to manage the application's state. DOM elements are cached in an `elements` object.
+*   **Modularity:** The code is organized into functions with specific responsibilities, such as `startCamera`, `takePhoto`, `addMetadataToImage`, etc.
+*   **Error Handling:** The code includes error handling for camera access, GPS, and other asynchronous operations. Status messages are displayed to the user.
+*   **Dependencies:** The project uses a few external libraries (`exif.js`, `piexif.js`) which are included directly in the project.

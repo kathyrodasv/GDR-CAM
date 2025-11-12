@@ -18,7 +18,10 @@ const appState = {
     zoomSupported: false, // Whether zoom is supported by the camera
     isGpsDisplayThrottled: false, // Flag to throttle GPS display updates
     gpsDisplayThrottleTime: 5000, // Throttle GPS display updates to every 5 seconds
-    isFormInteractionActive: false // Flag to pause background updates during form interaction
+    isFormInteractionActive: false, // Flag to pause background updates during form interaction
+    flashModes: ['auto', 'flash', 'off'], // Available flash modes
+    currentFlashIndex: 0, // Current flash mode index
+    flashSupported: false // Whether flash is supported by the camera
 };
 
 // DOM Elements
@@ -42,6 +45,7 @@ const elements = {
     rotateRightBtn: null,
     otherWorkFrontGroup: null, // For the custom work front input
     otherWorkFrontInput: null,
+    flashToggleBtn: null,
 };
 
 // Initialize the application
@@ -67,6 +71,11 @@ function init() {
     elements.zoomLevelDisplay = document.getElementById('zoom-level');
     elements.otherWorkFrontGroup = document.getElementById('other-work-front-group');
     elements.otherWorkFrontInput = document.getElementById('other-work-front');
+    elements.flashToggleBtn = document.getElementById('flash-toggle');
+    
+    // Load dynamic and persistent data
+    loadWorkFronts();
+    loadPersistentData();
     
     // Initialize zoom controls
     initializeZoomControls();
@@ -101,25 +110,64 @@ function init() {
     });
 }
 
+// Function to load work fronts from JSON file
+async function loadWorkFronts() {
+    try {
+        const response = await fetch('frentes.json');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const workFronts = await response.json();
+        
+        const workFrontSelect = document.getElementById('work-front');
+        const otherOption = workFrontSelect.querySelector('option[value="otro"]');
+        
+        workFronts.forEach(front => {
+            const option = document.createElement('option');
+            option.value = front;
+            option.textContent = front;
+            // Insert before the 'Otro' option
+            workFrontSelect.insertBefore(option, otherOption);
+        });
+
+    } catch (error) {
+        console.error('Could not load work fronts:', error);
+        showStatus('Error al cargar la lista de frentes de trabajo.', 'error');
+    }
+}
+
+// Function to load persistent form data from localStorage
+function loadPersistentData() {
+    try {
+        const savedData = localStorage.getItem('gdrCamFormData');
+        if (savedData) {
+            const formData = JSON.parse(savedData);
+            document.getElementById('work-front').value = formData.workFront || '';
+            document.getElementById('coronation').value = formData.coronation || '';
+            document.getElementById('observation-category').value = formData.observationCategory || '';
+            document.getElementById('activity-performed').value = formData.activityPerformed || '';
+        }
+    } catch (e) {
+        console.error("Error loading form data from localStorage:", e);
+    }
+}
+
 // Function to lock screen orientation to portrait mode
 function lockScreenOrientation() {
     if (screen.orientation && screen.orientation.lock) {
-        // Modern browsers with Screen Orientation API
         screen.orientation.lock('portrait')
             .then(() => {
                 console.log('Screen orientation locked to portrait');
-                // Add event listener to unlock when page is hidden
                 document.addEventListener('visibilitychange', handleVisibilityChange);
                 window.addEventListener('beforeunload', unlockScreenOrientation);
             })
             .catch(error => {
                 console.warn('Screen orientation lock failed:', error);
-                // Fallback for older browsers or unsupported devices
-                attemptFallbackOrientationLock();
+                showStatus('No se pudo bloquear la orientación de la pantalla. La aplicación podría girar.', 'info');
             });
     } else {
-        // Fallback for older browsers or unsupported devices
-        attemptFallbackOrientationLock();
+        console.warn('Screen Orientation API not supported.');
+        showStatus('La API de orientación de pantalla no es compatible. La aplicación podría girar.', 'info');
     }
 }
 
@@ -139,27 +187,6 @@ function unlockScreenOrientation() {
         screen.orientation.unlock();
         console.log('Screen orientation unlocked');
     }
-}
-
-// Fallback for browsers that don't support Screen Orientation API
-function attemptFallbackOrientationLock() {
-    // Add CSS to force portrait display
-    const style = document.createElement('style');
-    style.textContent = `
-        @media screen and (orientation: landscape) {
-            body {
-                transform: rotate(90deg);
-                transform-origin: top left;
-                width: 100vh;
-                height: 100vw;
-                overflow: hidden;
-                position: absolute;
-                top: 0;
-                left: 0;
-            }
-        }
-    `;
-    document.head.appendChild(style);
 }
 
 // Function to initialize zoom controls
@@ -453,6 +480,46 @@ function attachEventListeners() {
             metadataModal.classList.add('hidden');
         }
     });
+
+    elements.flashToggleBtn.addEventListener('click', toggleFlash);
+}
+
+// Function to cycle through flash modes
+function toggleFlash() {
+    if (!appState.flashSupported) return;
+    
+    appState.currentFlashIndex = (appState.currentFlashIndex + 1) % appState.flashModes.length;
+    updateFlashControl();
+}
+
+// Function to update the flash button UI
+function updateFlashControl() {
+    if (!elements.flashToggleBtn) return;
+
+    const currentMode = appState.flashModes[appState.currentFlashIndex];
+    const icon = elements.flashToggleBtn.querySelector('i');
+    
+    switch (currentMode) {
+        case 'auto':
+            icon.className = 'fas fa-bolt';
+            elements.flashToggleBtn.title = 'Flash: Automático';
+            break;
+        case 'flash':
+            icon.className = 'fas fa-bolt';
+            elements.flashToggleBtn.title = 'Flash: Encendido';
+            break;
+        case 'off':
+            icon.className = 'fas fa-ban'; // Using a 'ban' icon for off
+            elements.flashToggleBtn.title = 'Flash: Apagado';
+            break;
+    }
+    // A visual cue for 'on' vs 'auto' could be color, but for now, title is enough.
+    // For 'flash' (on), we can make the icon more prominent.
+    if (currentMode === 'flash') {
+        icon.style.color = '#f5d742'; // A yellow color to indicate 'on'
+    } else {
+        icon.style.color = 'white';
+    }
 }
 
 // Start camera function
@@ -471,49 +538,32 @@ async function startCamera() {
 
         appState.isCameraActive = true; // Set early to prevent multiple concurrent attempts
         
-        // First try with rear (environment) camera at highest resolution
-        let constraints = { 
-            video: { 
-                facingMode: 'environment',
-                width: { ideal: 3840 },  // Aumentado a 4K para mayor calidad
-                height: { ideal: 2160 },
-                aspectRatio: { ideal: 16/9 } // Mantener el aspect ratio
-            } 
-        };
-        
-        try {
-            appState.stream = await navigator.mediaDevices.getUserMedia(constraints);
-        } catch (err1) {
-            console.warn('Intento 1 fallido (trasera, alta res). Intentando con trasera por defecto.', err1.name);
+        const constraintAttempts = [
+            // 1. Rear camera, default resolution (most compatible)
+            { video: { facingMode: 'environment' } },
+            // 2. Front camera, default resolution
+            { video: { facingMode: 'user' } },
+            // 3. Any camera, default resolution
+            { video: true },
+            // 4. Rear camera, 1080p (more demanding, but not 4K initially)
+            { video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 }, aspectRatio: { ideal: 16/9 } } },
+            // 5. Front camera, 1080p
+            { video: { facingMode: 'user', width: { ideal: 1920 }, height: { ideal: 1080 }, aspectRatio: { ideal: 16/9 } } },
+            // 6. Rear camera, 4K (highest demand, last resort)
+            { video: { facingMode: 'environment', width: { ideal: 3840 }, height: { ideal: 2160 }, aspectRatio: { ideal: 16/9 } } },
+            // 7. Front camera, 4K
+            { video: { facingMode: 'user', width: { ideal: 3840 }, height: { ideal: 2160 }, aspectRatio: { ideal: 16/9 } } }
+        ];
+
+        for (let i = 0; i < constraintAttempts.length; i++) {
+            const constraints = constraintAttempts[i];
             try {
-                const constraintsFallback = { 
-                    video: { facingMode: 'environment' } 
-                };
-                appState.stream = await navigator.mediaDevices.getUserMedia(constraintsFallback);
-            } catch (err2) {
-                console.warn('Intento 2 fallido (trasera, por defecto). Intentando con frontal alta res.', err2.name);
-                try {
-                    const constraintsAlt = { 
-                        video: { 
-                            facingMode: 'user',
-                            width: { ideal: 3840 },
-                            height: { ideal: 2160 },
-                            aspectRatio: { ideal: 16/9 }
-                        } 
-                    };
-                    appState.stream = await navigator.mediaDevices.getUserMedia(constraintsAlt);
-                } catch (err3) {
-                    console.warn('Intento 3 fallido (frontal, alta res). Intentando con frontal por defecto.', err3.name);
-                    try {
-                        const constraintsUserDefault = { video: { facingMode: 'user' } };
-                        appState.stream = await navigator.mediaDevices.getUserMedia(constraintsUserDefault);
-                    } catch (err4) {
-                        console.warn('Intento 4 fallido (frontal, por defecto). Intentando con cualquier cámara disponible.', err4.name);
-                        // Final attempt: try to get any video input, without specifying facingMode
-                        const finalAttemptConstraints = { video: true };
-                        appState.stream = await navigator.mediaDevices.getUserMedia(finalAttemptConstraints);
-                    }
-                }
+                appState.stream = await navigator.mediaDevices.getUserMedia(constraints);
+                console.log(`Cámara iniciada con éxito con el intento ${i + 1}.`);
+                break; // Success, exit loop
+            } catch (err) {
+                console.warn(`Intento ${i + 1} fallido:`, err.name, err.message);
+                appState.stream = null; // Ensure stream is null if attempt failed
             }
         }
         
@@ -524,8 +574,8 @@ async function startCamera() {
                 appState.imageCapture = new ImageCapture(track);
             }
             
-            // Check if zoom is supported
-            await initializeZoomCapabilities(track);
+            // Check if zoom and flash are supported
+            await initializeCameraCapabilities(track);
             
             elements.takePhotoBtn.disabled = true; // Disable until location is obtained
             showStatus('Cámara iniciada. Obteniendo ubicación...', 'success');
@@ -533,7 +583,7 @@ async function startCamera() {
             // Attempt to get location
             await getCurrentLocation();
         } else {
-            throw new Error('No se pudo iniciar la cámara');
+            throw new Error('No se pudo iniciar la cámara después de varios intentos.');
         }
     } catch (err) {
         // Reset camera state on error
@@ -559,25 +609,26 @@ async function startCamera() {
     }
 }
 
-// Function to initialize zoom capabilities for the camera
-async function initializeZoomCapabilities(track) {
+// Function to initialize camera capabilities like zoom and flash
+async function initializeCameraCapabilities(track) {
     if (!track) {
-        console.warn('No video track available for zoom initialization');
+        console.warn('No video track available for capabilities initialization');
         appState.zoomSupported = false;
+        appState.flashSupported = false;
         appState.maxZoom = 1.0;
         updateZoomControls();
+        if(elements.flashToggleBtn) elements.flashToggleBtn.disabled = true;
         return;
     }
 
-    // Check if the track supports zoom
+    // Check for capabilities
     const capabilities = track.getCapabilities ? track.getCapabilities() : {};
     
+    // Handle Zoom
     if (capabilities.zoom) {
         appState.zoomSupported = true;
-        // Set max zoom to the maximum supported by the camera, or 10x if no maximum is specified
         appState.maxZoom = capabilities.zoom.max ? Math.min(capabilities.zoom.max, 10) : 10;
-        appState.currentZoom = 1.0; // Start at 1x zoom
-        
+        appState.currentZoom = 1.0;
         console.log(`Zoom supported. Max zoom: ${appState.maxZoom}x`);
     } else {
         console.log('Zoom not supported by this camera');
@@ -585,8 +636,27 @@ async function initializeZoomCapabilities(track) {
         appState.maxZoom = 1.0;
     }
     
-    // Update zoom controls to reflect current state
+    // Handle Flash
+    if (capabilities.fillLightMode) {
+        // Check if more than one mode is supported (i.e., not just 'off')
+        if (Array.isArray(capabilities.fillLightMode) && capabilities.fillLightMode.length > 1) {
+            appState.flashSupported = true;
+            elements.flashToggleBtn.disabled = false;
+            console.log('Flash control supported.');
+        } else {
+            appState.flashSupported = false;
+            elements.flashToggleBtn.disabled = true;
+            console.log('Flash control not supported or limited.');
+        }
+    } else {
+        console.log('Flash control not supported by this camera');
+        appState.flashSupported = false;
+        elements.flashToggleBtn.disabled = true;
+    }
+    
+    // Update UI controls
     updateZoomControls();
+    updateFlashControl();
 }
 
 // Attempt to get current location with enhanced precision and start watching for better readings
@@ -801,8 +871,8 @@ async function takePhoto() {
             // Draw the image with maximum quality
             context.drawImage(imageSource, 0, 0, width, height);
             
-            // Capture with maximum quality (98%)
-            let imageDataUrl = canvas.toDataURL('image/jpeg', 0.98); // Calidad aumentada para mejor detalle
+            // Capture with maximum quality (95%)
+            let imageDataUrl = canvas.toDataURL('image/jpeg', 0.95); // Calidad aumentada para mejor detalle
 
             // Correct the image orientation based on EXIF data before storing
             try {
@@ -853,7 +923,7 @@ async function takePhoto() {
         const photoSettings = {
             imageWidth: 3840,  // Aumentado a 4K
             imageHeight: 2160,
-            fillLightMode: 'auto'
+            fillLightMode: appState.flashModes[appState.currentFlashIndex]
         };
         
         appState.imageCapture.takePhoto(photoSettings)
@@ -945,6 +1015,20 @@ function handleSaveMetadata() {
         location: bestLocationForMetadata,
         timestamp: new Date().toLocaleString() // Using local time format instead of ISO string
     };
+
+    // --- PERSISTENCE: Save form data to localStorage ---
+    try {
+        const formDataToSave = {
+            workFront,
+            coronation,
+            observationCategory,
+            activityPerformed
+        };
+        localStorage.setItem('gdrCamFormData', JSON.stringify(formDataToSave));
+    } catch (e) {
+        console.error("Error saving form data to localStorage:", e);
+    }
+    // --- END PERSISTENCE ---
     
     // Show loading indicator
     elements.saveMetadataBtn.innerHTML = '<span class="loading"></span> Procesando...';
@@ -1511,6 +1595,10 @@ function newCapture() {
     appState.photoWithMetadata = null;
     elements.photoPreview.src = ''; // Limpiar la vista previa de la imagen
     
+    // --- PERSISTENCE: Load last used form data ---
+    loadPersistentData();
+    // --- END PERSISTENCE ---
+
     // Stop location watching when starting a new capture
     stopLocationWatching();
     
