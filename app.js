@@ -888,166 +888,344 @@ function stopLocationWatching() {
 }
 
 // Function to crop an image to a specific aspect ratio (e.g., 16:9)
-function cropToAspectRatio(img, targetAspectRatio) {
-    const originalWidth = img.width;
-    const originalHeight = img.height;
-    const originalAspectRatio = originalWidth / originalHeight;
+function cropToAspectRatio(imageDataUrl) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+            const originalWidth = img.width;
+            const originalHeight = img.height;
 
-    if (Math.abs(originalAspectRatio - targetAspectRatio) < 0.01) {
-        return { sx: 0, sy: 0, sWidth: originalWidth, sHeight: originalHeight };
-    }
+            // Determine if the image is portrait or landscape
+            const isPortrait = originalHeight > originalWidth;
+            const targetAspectRatio = isPortrait ? 9 / 16 : 16 / 9;
 
-    let sx, sy, sWidth, sHeight;
-    if (originalAspectRatio > targetAspectRatio) {
-        sHeight = originalHeight;
-        sWidth = originalHeight * targetAspectRatio;
-        sx = (originalWidth - sWidth) / 2;
-        sy = 0;
-    } else {
-        sWidth = originalWidth;
-        sHeight = originalWidth / targetAspectRatio;
-        sx = 0;
-        sy = (originalHeight - sHeight) / 2;
-    }
-    return { sx, sy, sWidth, sHeight };
-}
+            const originalAspectRatio = originalWidth / originalHeight;
 
-// Take photo - Optimized for performance
-async function takePhoto() {
-    elements.takePhotoBtn.disabled = true;
-    elements.takePhotoBtn.innerHTML = '<span class="loading"></span> Procesando...';
-
-    try {
-        let imageBlob;
-        if (appState.imageCapture) {
-            const photoSettings = { fillLightMode: appState.flashModes[appState.currentFlashIndex] };
-            try {
-                imageBlob = await appState.imageCapture.takePhoto(photoSettings);
-            } catch (error) {
-                console.warn('Error taking photo with settings, trying without:', error);
-                imageBlob = await appState.imageCapture.takePhoto();
+            // If the aspect ratio is already correct (with a small tolerance), no need to crop
+            if (Math.abs(originalAspectRatio - targetAspectRatio) < 0.01) {
+                resolve(imageDataUrl);
+                return;
             }
-        } else {
+
+            let sx, sy, sWidth, sHeight;
+
+            // Calculate cropping dimensions
+            if (originalAspectRatio > targetAspectRatio) {
+                // Image is wider than target, crop width (horizontal crop)
+                sHeight = originalHeight;
+                sWidth = originalHeight * targetAspectRatio;
+                sx = (originalWidth - sWidth) / 2;
+                sy = 0;
+            } else {
+                // Image is taller than target, crop height (vertical crop)
+                sWidth = originalWidth;
+                sHeight = originalWidth / targetAspectRatio;
+                sx = 0;
+                sy = (originalHeight - sHeight) / 2;
+            }
+
             const canvas = document.createElement('canvas');
-            canvas.width = elements.video.videoWidth;
-            canvas.height = elements.video.videoHeight;
+            canvas.width = sWidth;
+            canvas.height = sHeight;
             const ctx = canvas.getContext('2d');
-            ctx.drawImage(elements.video, 0, 0);
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
-            imageBlob = await (await fetch(dataUrl)).blob();
-        }
 
-        const imageBitmap = await createImageBitmap(imageBlob);
+            // Draw the cropped portion of the image onto the canvas
+            ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, sWidth, sHeight);
 
-        // Stop video stream as soon as possible
-        if (appState.stream) {
-            appState.stream.getTracks().forEach(track => track.stop());
-            appState.stream = null;
-        }
-        elements.video.srcObject = null;
-
-        const processedImageUrl = await processImageWithWorker(imageBitmap);
-        appState.capturedPhotoDataUrl = processedImageUrl;
-
-        elements.cameraSection.classList.add('hidden');
-        elements.formSection.classList.remove('hidden');
-        elements.takePhotoBtn.innerHTML = 'Tomar Foto';
-        appState.isCameraActive = false;
-
-        if (appState.bestLocation) {
-            const gpsDisplay = document.getElementById('gps-coords');
-            gpsDisplay.value = `${appState.bestLocation.latitude.toFixed(7)}, ${appState.bestLocation.longitude.toFixed(7)} (±${Math.round(appState.bestLocation.accuracy)}m)`;
-        }
-
-    } catch (error) {
-        console.error('Error critical during photo capture:', error);
-        showStatus('Error crítico al tomar la foto.', 'error');
-        restartCamera();
-    }
-}
-
-async function processImageWithWorker(imageBitmap) {
-    const orientation = await getImageOrientation(imageBitmap);
-    const isPortrait = imageBitmap.height > imageBitmap.width;
-    const targetAspectRatio = isPortrait ? 9 / 16 : 16 / 9;
-    const crop = cropToAspectRatio(imageBitmap, targetAspectRatio);
-
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-
-    // Set canvas dimensions based on orientation and crop
-    let canvasWidth = crop.sWidth;
-    let canvasHeight = crop.sHeight;
-    if (orientation >= 5 && orientation <= 8) { // Rotated 90 or 270 degrees
-        [canvasWidth, canvasHeight] = [canvasHeight, canvasWidth];
-    }
-    canvas.width = canvasWidth;
-    canvas.height = canvasHeight;
-
-    ctx.save();
-    // Apply orientation transform
-    switch (orientation) {
-        case 2: ctx.translate(canvasWidth, 0); ctx.scale(-1, 1); break;
-        case 3: ctx.translate(canvasWidth, canvasHeight); ctx.rotate(Math.PI); break;
-        case 4: ctx.translate(0, canvasHeight); ctx.scale(1, -1); break;
-        case 5: ctx.rotate(0.5 * Math.PI); ctx.scale(1, -1); break;
-        case 6: ctx.rotate(0.5 * Math.PI); ctx.translate(0, -canvasHeight); break;
-        case 7: ctx.rotate(0.5 * Math.PI); ctx.translate(canvasWidth, -canvasHeight); ctx.scale(-1, 1); break;
-        case 8: ctx.rotate(-0.5 * Math.PI); ctx.translate(-canvasWidth, 0); break;
-    }
-
-    // Draw the cropped image
-    const w = (orientation >= 5 && orientation <= 8) ? crop.sHeight : crop.sWidth;
-    const h = (orientation >= 5 && orientation <= 8) ? crop.sWidth : crop.sHeight;
-    ctx.drawImage(imageBitmap, crop.sx, crop.sy, crop.sWidth, crop.sHeight, 0, 0, w, h);
-    ctx.restore();
-
-    return canvas.toDataURL('image/jpeg', 0.95);
-}
-
-// Function to get the EXIF orientation of the image
-function getImageOrientation(source) {
-    return new Promise((resolve) => {
-        if (source instanceof ImageBitmap) {
-            // Cannot read EXIF from ImageBitmap directly, need to convert back to blob
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = source.width;
-            tempCanvas.height = source.height;
-            const tempCtx = tempCanvas.getContext('2d');
-            tempCtx.drawImage(source, 0, 0);
-            tempCanvas.toBlob(blob => {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    const view = new DataView(e.target.result);
-                    // This is a simplified EXIF parser, might not cover all cases
-                    // For robust solution, a proper EXIF library on a blob is needed
-                    // For now, we assume piexif can handle it if we pass a dataURL
-                    const img = new Image();
-                    img.onload = function() {
-                        EXIF.getData(img, function() {
-                            resolve(EXIF.getTag(this, "Orientation") || 1);
-                        });
-                    };
-                    img.src = URL.createObjectURL(blob);
-                };
-                reader.readAsArrayBuffer(blob);
-            }, 'image/jpeg');
-        } else { // Fallback for dataURL
-            const img = new Image();
-            img.onload = function() {
-                EXIF.getData(img, function() {
-                    resolve(EXIF.getTag(this, "Orientation") || 1);
-                });
-            };
-            img.onerror = () => resolve(1);
-            img.src = source;
-        }
+            // Get the cropped image as a data URL
+            resolve(canvas.toDataURL('image/jpeg', 0.96)); // Calidad reducida para mayor velocidad
+        };
+        img.onerror = () => reject(new Error('Error al cargar la imagen para recortar.'));
+        img.src = imageDataUrl;
     });
 }
 
-// This function is no longer needed as its logic is integrated into processImageWithWorker
-// function correctImageOrientation(imageDataUrl) { ... }
+// Take photo
+async function takePhoto() {
+    // Disable button to prevent multiple clicks and show processing state
+    elements.takePhotoBtn.disabled = true;
+    elements.takePhotoBtn.innerHTML = '<span class="loading"></span> Procesando...';
 
+
+    const processImage = async (imageSource) => {
+        try {
+            const canvas = document.createElement('canvas');
+            // Use actual video/source dimensions for maximum quality
+            const width = imageSource.videoWidth || imageSource.width;
+            const height = imageSource.videoHeight || imageSource.height;
+            
+            canvas.width = width;
+            canvas.height = height;
+            const context = canvas.getContext('2d');
+            
+            // Draw the image with maximum quality
+            context.drawImage(imageSource, 0, 0, width, height);
+            
+            // Capture with maximum quality (95%)
+            let imageDataUrl = canvas.toDataURL('image/jpeg', 0.95); // Calidad aumentada para mejor detalle
+
+            // Correct the image orientation based on EXIF data before storing
+            try {
+                imageDataUrl = await correctImageOrientation(imageDataUrl);
+            } catch (orientationError) {
+                console.warn('Could not correct image orientation:', orientationError);
+                // If orientation correction fails, use the original image
+            }
+
+            // Crop the image to 16:9 or 9:16 aspect ratio
+            try {
+                const croppedImageDataUrl = await cropToAspectRatio(imageDataUrl);
+                appState.capturedPhotoDataUrl = croppedImageDataUrl;
+            } catch (cropError) {
+                console.error('Error al recortar la imagen:', cropError);
+                appState.capturedPhotoDataUrl = imageDataUrl; // Use uncropped image on error
+            }
+
+            // Stop video tracks properly
+            if (appState.stream) {
+                appState.stream.getTracks().forEach(track => track.stop());
+                appState.stream = null;
+            }
+            elements.video.srcObject = null;
+            elements.cameraSection.classList.add('hidden');
+            elements.formSection.classList.remove('hidden');
+            
+            // Restore button state
+            elements.takePhotoBtn.innerHTML = 'Tomar Foto';
+
+            appState.isCameraActive = false;
+            
+            // Update the GPS display with the best location found so far
+            if (appState.bestLocation) {
+                const gpsDisplay = document.getElementById('gps-coords');
+                gpsDisplay.value = `${appState.bestLocation.latitude.toFixed(7)}, ${appState.bestLocation.longitude.toFixed(7)} (±${Math.round(appState.bestLocation.accuracy)}m)`;
+            }
+        } catch (error) {
+            console.error('Error processing the captured image:', error);
+            showStatus('Error al procesar la imagen capturada.', 'error');
+            // Attempt to restart the camera on processing failure
+            restartCamera();
+        }
+    };
+
+    if (appState.imageCapture) {
+        // Re-introduce photoSettings just for flash control.
+        const photoSettings = {
+            fillLightMode: appState.flashModes[appState.currentFlashIndex]
+        };
+        console.log('Taking photo with settings:', photoSettings);
+
+        appState.imageCapture.takePhoto(photoSettings)
+            .then(blob => {
+                const objectURL = URL.createObjectURL(blob);
+                const image = new Image();
+                image.src = objectURL;
+                image.onload = async () => { // image is the Image object
+                    await processImage(image);
+                    URL.revokeObjectURL(objectURL); // Liberar memoria del Object URL
+                };
+                image.onerror = (error) => {
+                    URL.revokeObjectURL(objectURL); // Liberar memoria también en caso de error
+                    console.error('Error loading captured photo:', error);
+                    showStatus('Error al cargar la foto capturada.', 'error');
+                    restartCamera();
+                };
+            })
+            .catch(error => {
+                console.error('Error taking photo with settings, trying without:', error);
+                // Fallback if even flash settings fail on some devices
+                appState.imageCapture.takePhoto().then(blob => {
+                    const objectURL = URL.createObjectURL(blob);
+                    const image = new Image();
+                    image.src = objectURL;
+                    image.onload = async () => { 
+                        await processImage(image);
+                        URL.revokeObjectURL(objectURL);
+                    }
+                }).catch(err2 => {
+                    console.error('Error taking photo on fallback attempt:', err2);
+                    showStatus('Error crítico al tomar la foto.', 'error');
+                    restartCamera();
+                });
+            });
+    } else {
+        // Fallback for browsers without ImageCapture
+        try {
+            await processImage(elements.video);
+        } catch (fallbackError) {
+            console.error('Error taking photo with video fallback:', fallbackError);
+            showStatus('Error crítico al tomar la foto. Reiniciando cámara...', 'error');
+            restartCamera();
+        }
+    }
+}
+
+// Handle save metadata
+function handleSaveMetadata() {
+    const workFrontSelect = document.getElementById('work-front');
+    let workFront = workFrontSelect.value;
+    const coronation = document.getElementById('coronation').value;
+    const activityPerformed = document.getElementById('activity-performed').value;
+    const observationCategory = document.getElementById('observation-category').value;
+    
+    // If 'Otro' is selected, get the value from the text input
+    if (workFront === 'otro') {
+        workFront = elements.otherWorkFrontInput.value.trim();
+        if (!workFront) {
+            showStatus('Por favor, especifique el Frente de Trabajo personalizado.', 'error');
+            return;
+        }
+    } else if (!workFront || !coronation || !observationCategory) {
+        showStatus('Por favor complete todos los campos requeridos del formulario.', 'error');
+        return;
+    }
+    
+    // Use the best location found during the form filling period
+    const bestLocationForMetadata = appState.bestLocation || appState.currentLocation;
+    
+    // Create metadata object
+    const metadata = {
+        workFront,
+        coronation,
+        activityPerformed,
+        observationCategory,
+        location: bestLocationForMetadata,
+        timestamp: new Date().toLocaleString() // Using local time format instead of ISO string
+    };
+
+    // --- PERSISTENCE: Save form data to localStorage ---
+    try {
+        const formDataToSave = {
+            workFront,
+            coronation,
+            observationCategory,
+            activityPerformed
+        };
+        localStorage.setItem('gdrCamFormData', JSON.stringify(formDataToSave));
+    } catch (e) {
+        console.error("Error saving form data to localStorage:", e);
+    }
+    // --- END PERSISTENCE ---
+    
+    // Show loading indicator
+    elements.saveMetadataBtn.innerHTML = '<span class="loading"></span> Procesando...';
+    elements.saveMetadataBtn.disabled = true;
+    
+    // Stop GPS watching as we're now saving the metadata
+    stopLocationWatching();
+    
+    // Add metadata to image
+    addMetadataToImage(appState.capturedPhotoDataUrl, metadata);
+}
+
+// Function to get the EXIF orientation of the image
+function getImageOrientation(imageDataUrl) {
+    return new Promise((resolve) => {
+        // Load the image to check its EXIF data
+        const img = new Image();
+        img.onload = function() {
+            // Use exif.js to read the orientation
+            EXIF.getData(img, function() {
+                const orientation = EXIF.getTag(this, "Orientation");
+                resolve(orientation || 1); // Default to 1 if no orientation found
+            });
+        };
+        img.onerror = function() {
+            resolve(1); // Default orientation if image fails to load
+        };
+        img.src = imageDataUrl;
+    });
+}
+
+// Function to correct image orientation based on EXIF data
+function correctImageOrientation(imageDataUrl) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = function() {
+            EXIF.getData(img, function() {
+                const orientation = EXIF.getTag(this, "Orientation");
+                
+                if (!orientation || orientation === 1) {
+                    // No rotation needed, return original image
+                    resolve(imageDataUrl);
+                    return;
+                }
+                
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                
+                // Set canvas dimensions based on image orientation
+                // Set canvas dimensions based on orientation
+                let { width, height } = img;
+                if (orientation >= 5 && orientation <= 8) {
+                    [width, height] = [height, width]; // Swap dimensions for rotated images
+                }
+                
+                canvas.width = width;
+                canvas.height = height;
+                
+                // Apply transformations based on EXIF orientation
+                ctx.save();
+                
+                switch (orientation) {
+                    case 2:
+                        // Flip horizontal
+                        ctx.translate(width, 0);
+                        ctx.scale(-1, 1);
+                        break;
+                    case 3:
+                        // Rotate 180
+                        ctx.translate(width, height);
+                        ctx.rotate(Math.PI);
+                        break;
+                    case 4:
+                        // Flip vertical
+                        ctx.translate(0, height);
+                        ctx.scale(1, -1);
+                        break;
+                    case 5:
+                        // Flip along top-left to bottom-right diagonal
+                        ctx.rotate(0.5 * Math.PI);
+                        ctx.scale(1, -1);
+                        break;
+                    case 6:
+                        // Rotate 90
+                        ctx.rotate(0.5 * Math.PI);
+                        ctx.translate(0, -height);
+                        break;
+                    case 7:
+                        // Flip along top-right to bottom-left diagonal
+                        ctx.rotate(0.5 * Math.PI);
+                        ctx.translate(width, -height);
+                        ctx.scale(-1, 1);
+                        break;
+                    case 8:
+                        // Rotate -90
+                        ctx.rotate(-0.5 * Math.PI);
+                        ctx.translate(-width, 0);
+                        break;
+                    default:
+                        // No rotation needed
+                        ctx.restore();
+                        resolve(imageDataUrl);
+                        return;
+                }
+                
+                // Draw the image on the canvas with correct orientation
+                ctx.drawImage(img, 0, 0, img.width, img.height);
+                ctx.restore();
+                
+                resolve(canvas.toDataURL('image/jpeg', 0.92));
+            });
+        };
+
+        img.onerror = function() {
+            reject(new Error('Error loading image for orientation correction'));
+        };
+        
+        img.src = imageDataUrl;
+    });
+}
 // End of old correctImageOrientation function
 
 // Function to draw date/time and logo on image ensuring labels remain horizontal
