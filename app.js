@@ -1737,7 +1737,18 @@ async function addMetadataToImage(imageDataUrl, metadata) {
                 await rotateImage(-90);
 
                 // Save to gallery for future access
-                savePhotoToGallery(newImage, metadata);
+                try {
+                    savePhotoToGallery(newImage, metadata);
+                } catch (e) {
+                    if (e.name === 'QuotaExceededError') {
+                        console.error('Quota exceeded while saving to gallery:', e);
+                        showStatus('Galería llena. No se pudo guardar la foto en la galería interna.', 'error');
+                        // The photo is still processed and can be saved to the device gallery.
+                    } else {
+                        // Re-throw other errors
+                        throw e;
+                    }
+                }
 
                 // If the preview image is not correctly oriented for display, we may need to correct it specifically for the preview
                 // The image should already be corrected by drawTimestampAndLogoOnImage, but let's ensure preview shows correctly
@@ -1757,7 +1768,14 @@ async function addMetadataToImage(imageDataUrl, metadata) {
 
             } catch (err) {
                 console.error('Error in addMetadataToImage:', err);
-                showStatus('Error al guardar los metadatos: ' + err.message, 'error');
+                if (err.name === 'QuotaExceededError') {
+                    showStatus('Error: Almacenamiento lleno. No se pueden guardar los metadatos. Intente limpiar la galería.', 'error');
+                } else if (err.message.includes("exceeded")) { // Another way quota errors can appear
+                    showStatus('Error: Almacenamiento lleno. No se pueden guardar los metadatos. Intente limpiar la galería.', 'error');
+                }
+                else {
+                    showStatus('Error al guardar los metadatos: ' + err.message, 'error');
+                }
                 
                 // Reset both buttons if they exist
                 if (elements.saveMetadataBtn) {
