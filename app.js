@@ -622,14 +622,14 @@ async function startCamera() {
         appState.isCameraActive = true; // Set early to prevent multiple concurrent attempts
         
         const constraintAttempts = [
-            // 1. Try rear camera, 4K (Best quality)
-            { video: { facingMode: 'environment', width: { ideal: 3840 }, height: { ideal: 2160 }, aspectRatio: { ideal: 16/9 } } },
+            // 1. Try rear camera, 2K (QHD - Good quality)
+            { video: { facingMode: 'environment', width: { ideal: 2560 }, height: { ideal: 1440 }, aspectRatio: { ideal: 16/9 } } },
             // 2. Try rear camera, 1080p
             { video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 }, aspectRatio: { ideal: 16/9 } } },
             // 3. Try rear camera, default resolution (High compatibility)
             { video: { facingMode: 'environment' } },
-            // 4. Try front camera, 4K
-            { video: { facingMode: 'user', width: { ideal: 3840 }, height: { ideal: 2160 }, aspectRatio: { ideal: 16/9 } } },
+            // 4. Try front camera, 2K (QHD)
+            { video: { facingMode: 'user', width: { ideal: 2560 }, height: { ideal: 1440 }, aspectRatio: { ideal: 16/9 } } },
             // 5. Try front camera, 1080p
             { video: { facingMode: 'user', width: { ideal: 1920 }, height: { ideal: 1080 }, aspectRatio: { ideal: 16/9 } } },
             // 6. Try front camera, default resolution
