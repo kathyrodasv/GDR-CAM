@@ -1,6 +1,6 @@
-const CACHE_NAME = 'gdr-cam-v68.6.0';
-const STATIC_CACHE_NAME = 'gdr-cam-static-v68.6.0';
-const RUNTIME_CACHE_NAME = 'gdr-cam-runtime-v68.6.0';
+const CACHE_NAME = 'gdr-cam-v68.6.1';
+const STATIC_CACHE_NAME = 'gdr-cam-static-v68.6.1';
+const RUNTIME_CACHE_NAME = 'gdr-cam-runtime-v68.6.1';
 
 const urlsToCache = [
   './',
@@ -57,33 +57,29 @@ self.addEventListener('fetch', (event) => {
   const isSameOrigin = self.location.origin === requestUrl.origin;
   const isNavigation = event.request.mode === 'navigate';
 
-  // Handle navigation requests (HTML pages) with network-first strategy with fallback
+  // Handle navigation requests (HTML pages) with a network-falling-back-to-cache strategy.
+  // This is ideal for "lie-fi" scenarios where the network is slow.
   if (isNavigation) {
     event.respondWith(
-      // Strategy: Cache First, then Network. This ensures instant loading.
-      caches.match(event.request).then(cachedResponse => {
-        // Try to fetch a new version from the network in the background.
-        const networkFetch = fetch(event.request).then(networkResponse => {
-          // If the fetch is successful, update the cache.
-          if (networkResponse.status === 200) {
-            const responseToCache = networkResponse.clone();
-            caches.open(RUNTIME_CACHE_NAME).then(cache => {
-              cache.put(event.request, responseToCache);
-            });
-          }
-          // If there was a cached response, we don't need to return the network one here,
-          // as the page is already loading. The update will be applied on next load.
-          return networkResponse;
-        }).catch(error => {
-          console.log('Network fetch for navigation failed, serving from cache.', error);
-        });
-
-        // Return the cached response immediately if it exists, otherwise wait for the network.
-        // If both fail, it will result in an error, but the cache should almost always have index.html.
-        return cachedResponse || networkFetch || caches.match('./index.html');
+      fetch(event.request).then(networkResponse => {
+        // Network request successful, update the cache and return the response.
+        if (networkResponse.status === 200) {
+          const responseToCache = networkResponse.clone();
+          caches.open(RUNTIME_CACHE_NAME).then(cache => {
+            cache.put(event.request, responseToCache);
+          });
+        }
+        return networkResponse;
+      }).catch(() => {
+        // Network request failed (offline, timeout, etc.), serve from cache.
+        console.log('Network fetch for navigation failed, serving from cache.');
+        // Try to match the specific navigation request first.
+        // If it's not in cache, fall back to the main index.html page.
+        return caches.match(event.request)
+          .then(cachedResponse => cachedResponse || caches.match('./index.html'));
       })
     );
-  } 
+  }
   // Handle API requests or cross-origin requests with network-first strategy
   else if (!isSameOrigin) {
     event.respondWith(
