@@ -1,6 +1,6 @@
-const CACHE_NAME = 'gdr-cam-v68.6.3';
-const STATIC_CACHE_NAME = 'gdr-cam-static-v68.6.3';
-const RUNTIME_CACHE_NAME = 'gdr-cam-runtime-v68.6.3';
+const CACHE_NAME = 'gdr-cam-v68.6.4';
+const STATIC_CACHE_NAME = 'gdr-cam-static-v68.6.4';
+const RUNTIME_CACHE_NAME = 'gdr-cam-runtime-v68.6.4';
 
 const urlsToCache = [
   './',
@@ -9,6 +9,7 @@ const urlsToCache = [
   './style.css',
   './exif.js',
   './piexif.js',
+  './frentes.json',
   './manifest.json',
   './img/LOGO GDR.jpeg',
   './img/icon-512x512.png',
